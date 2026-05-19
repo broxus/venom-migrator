@@ -12,8 +12,8 @@ fn main() -> Result<()> {
     };
     let git_version = get_git_version()?;
 
-    println!("cargo:rustc-env=PROOFS_API_VERSION={app_version}");
-    println!("cargo:rustc-env=PROOFS_API_BUILD={git_version}");
+    println!("cargo:rustc-env=VENOM_MIGRATOR_VERSION={app_version}");
+    println!("cargo:rustc-env=VENOM_MIGRATOR_BUILD={git_version}");
     Ok(())
 }
 

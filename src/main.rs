@@ -3,7 +3,9 @@ use std::process::ExitCode;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
-mod version;
+mod cmd {
+    pub mod run;
+}
 
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
@@ -29,7 +31,7 @@ fn main() -> ExitCode {
 }
 
 #[derive(Parser)]
-#[clap(version = version::version_string())]
+#[clap(version = venom_migrator::version_string())]
 #[clap(subcommand_required = true)]
 pub struct App {
     #[clap(subcommand)]
@@ -39,7 +41,7 @@ pub struct App {
 impl App {
     pub fn run(self) -> Result<()> {
         match self.cmd {
-            SubCmd::Run(cmd) => todo!(),
+            SubCmd::Run(cmd) => cmd.run(),
         }
     }
 }

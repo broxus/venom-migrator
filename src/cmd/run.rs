@@ -2,6 +2,8 @@ use anyhow::Result;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPoolOptions;
+use std::sync::Arc;
+use tokio::sync::Notify;
 use tycho_core::block_strider::{BlockProviderExt, MetricsSubscriber};
 use tycho_core::node::{LightNodeConfig, LightNodeContext, NodeBaseConfig, NodeBootArgs};
 use tycho_util::cli;
@@ -40,6 +42,8 @@ impl Cmd {
                 .connect(&config.db.url)
                 .await?;
 
+            sqlx::migrate!().run(&pool).await?;
+
             // Sync node.
             let _init_block_id = node
                 .init_ext(NodeBootArgs {
@@ -56,8 +60,16 @@ impl Cmd {
                 .with_fallback(archive_block_provider.clone());
 
             let sqlx_client = SqlxClient::new(pool);
-            let pending_messages = PendingMessages::default();
             let wallet_address = HighloadWallet::compute_address(&config.relay.wallet.secret)?;
+            anyhow::ensure!(
+                wallet_address == config.relay.wallet.address,
+                "wallet address mismatch: expected={}, got={}",
+                config.relay.wallet.address,
+                wallet_address,
+            );
+
+            let sync_ready = Arc::new(Notify::new());
+            let pending_messages = PendingMessages::default();
 
             let block_strider = node.build_strider(
                 archive_block_provider.chain((blockchain_block_provider, storage_block_provider)),
@@ -66,21 +78,36 @@ impl Cmd {
                         sqlx_client.clone(),
                         pending_messages.clone(),
                         wallet_address,
+                        sync_ready.clone(),
                     ),
                     MetricsSubscriber,
                 ),
             );
 
-            // Run block strider
+            tracing::info!(
+                "waiting for light subscriber to catch up before running relay"
+            );
+
             tokio::select! {
                 res = block_strider.run() => res?,
-                res = relay::run(&config.relay, sqlx_client, pending_messages) => res?,
+                res = run_relay_after_sync(sync_ready, &config.relay, sqlx_client, pending_messages) => res?,
             }
 
             // Done
             Ok(())
         })
     }
+}
+
+async fn run_relay_after_sync(
+    sync_ready: Arc<Notify>,
+    config: &RelayConfig,
+    sqlx_client: SqlxClient,
+    pending_messages: PendingMessages,
+) -> Result<()> {
+    sync_ready.notified().await;
+    tracing::info!("light subscriber caught up, starting relay");
+    relay::run(config, sqlx_client, pending_messages).await
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialConfig)]

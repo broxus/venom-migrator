@@ -1,4 +1,4 @@
-use everscale_jrpc_transaction_consumer::{StartFrom, TransactionConsumerOptions};
+use everscale_jrpc_transaction_consumer::TransactionConsumerOptions;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tycho_types::cell::HashBytes;
@@ -6,8 +6,9 @@ use tycho_types::models::StdAddr;
 use tycho_util::serde_helpers;
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
+#[serde(default)]
 pub struct RelayConfig {
-    pub transaction_consumer: TransactionConsumerConfig,
+    pub transaction_consumer: TransactionConsumerOptions,
 
     pub wallet: WalletConfig,
     pub deposit: DepositConfig,
@@ -16,32 +17,8 @@ pub struct RelayConfig {
     pub tycho_rpc: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct TransactionConsumerConfig {
-    pub start_from: StartFrom,
-    pub batch_size: u8,
-}
-
-impl Default for TransactionConsumerConfig {
-    fn default() -> Self {
-        let options = TransactionConsumerOptions::default();
-        Self {
-            start_from: options.start_from,
-            batch_size: options.batch_size,
-        }
-    }
-}
-
-impl From<TransactionConsumerConfig> for TransactionConsumerOptions {
-    fn from(value: TransactionConsumerConfig) -> Self {
-        Self {
-            start_from: value.start_from,
-            batch_size: value.batch_size,
-        }
-    }
-}
-
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
+#[serde(default)]
 pub struct DepositConfig {
     pub owner: StdAddr,
     pub token_roots: Vec<TokenRouteConfig>,
@@ -54,7 +31,9 @@ pub struct TokenRouteConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)]
 pub struct WalletConfig {
+    pub address: StdAddr,
     pub secret: HashBytes,
     #[serde(with = "serde_helpers::string")]
     pub min_required_balance: u128,
@@ -67,6 +46,7 @@ impl Default for WalletConfig {
     #[inline]
     fn default() -> Self {
         Self {
+            address: Default::default(),
             secret: Default::default(),
             min_required_balance: 10_000_000_000,
             transfer_batch_size: 50,

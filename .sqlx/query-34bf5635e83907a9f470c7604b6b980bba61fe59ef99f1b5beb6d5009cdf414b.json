@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE transactions\n                SET status = 'Pending'::transaction_status,\n                    sending_message_hash = $2,\n                    expired_at = $3,\n                    updated_at = current_timestamp\n                WHERE transaction_hash = $1 AND status = 'New'::transaction_status\n                RETURNING transaction_hash",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "transaction_hash",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "transactions",
+            "name": "transaction_hash"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Varchar",
+        "Numeric"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "34bf5635e83907a9f470c7604b6b980bba61fe59ef99f1b5beb6d5009cdf414b"
+}

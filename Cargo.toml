@@ -12,7 +12,7 @@ futures-util = "0.3.31"
 parking_lot = { version = "0.12.5" }
 serde = "1.0"
 thiserror = "2.0"
-tokio = { version = "1", default-features = false, features = ["time"] }
+tokio = { version = "1", default-features = false, features = ["sync", "time"] }
 tracing = "0.1"
 
 tikv-jemallocator = { version = "0.6.0", features = [
@@ -25,12 +25,14 @@ tycho-types = { version = "0.3.4", features = ["sync", "tycho", "models", "rand9
 tycho-core = { version = "0.3.6", features = ["cli"] }
 tycho-util = { version = "0.3.6", features = ["cli"] }
 num-traits = "0.2.19"
-nekoton-core = { version = "0.0.2", path = "../tycho-nekoton/core" }
-nekoton-transport = { version = "0.0.2", path = "../tycho-nekoton/transport" }
+nekoton-core = { version = "0.0.2", git = "https://github.com/broxus/tycho-nekoton.git" }
+nekoton-transport = { version = "0.0.2", git = "https://github.com/broxus/tycho-nekoton.git" }
 ed25519-dalek = "2.2.0"
 sqlx = { version = "0.9.0", features = ["runtime-tokio", "tls-native-tls", "postgres", "uuid", "chrono", "json", "bigdecimal"] }
 
 everscale-jrpc-transaction-consumer = { git = "https://github.com/broxus/jrpc-transaction-consumer", version = "0.1.0" }
+rand = "0.10.1"
+serde_json = "1.0.150"
 
 [build-dependencies]
 anyhow = "1.0"

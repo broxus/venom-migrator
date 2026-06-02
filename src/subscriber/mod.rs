@@ -1,5 +1,8 @@
 use anyhow::Result;
 use futures_util::future::BoxFuture;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use tokio::sync::Notify;
 use tycho_core::block_strider::{BlockSubscriber, BlockSubscriberContext};
 use tycho_types::cell::{CellSlice, HashBytes};
 use tycho_types::models::{Message, MsgInfo, ShardIdent, StdAddr, TxInfo};
@@ -9,10 +12,14 @@ use crate::utils::abi::UnpackAbiPlain;
 use crate::utils::pending_messages::PendingMessages;
 use crate::utils::token_wallets;
 
+const SYNC_READY_MAX_LAG_SEC: u32 = 60;
+
 pub struct LightSubscriber {
     sqlx_client: SqlxClient,
     pending_messages: PendingMessages,
     wallet_address: StdAddr,
+    sync_ready: Arc<Notify>,
+    sync_notified: AtomicBool,
 }
 
 pub struct DeliveredMessage {
@@ -34,11 +41,14 @@ impl LightSubscriber {
         sqlx_client: SqlxClient,
         pending_messages: PendingMessages,
         wallet_address: StdAddr,
+        sync_ready: Arc<Notify>,
     ) -> Self {
         Self {
             sqlx_client,
             pending_messages,
             wallet_address,
+            sync_ready,
+            sync_notified: AtomicBool::new(false),
         }
     }
 
@@ -46,7 +56,7 @@ impl LightSubscriber {
         &self,
         cx: &BlockSubscriberContext,
     ) -> Result<LightSubscriberPrepared> {
-        tracing::info!(
+        tracing::trace!(
             block_id = %cx.block.id(),
             mc_block_id = %cx.mc_block_id,
             "preparing block"
@@ -141,7 +151,7 @@ impl LightSubscriber {
             )
             .await?;
 
-        for message in prepared.delivered_messages {
+        for message in &prepared.delivered_messages {
             self.pending_messages
                 .deliver_message(message.account, message.message_hash);
         }
@@ -149,7 +159,22 @@ impl LightSubscriber {
         self.pending_messages
             .update(&prepared.shard, prepared.gen_utime);
 
+        self.notify_synced(&prepared);
+
         Ok(())
+    }
+
+    fn notify_synced(&self, prepared: &LightSubscriberPrepared) {
+        let lag = tycho_util::time::now_sec().saturating_sub(prepared.gen_utime);
+        if lag > SYNC_READY_MAX_LAG_SEC {
+            return;
+        }
+
+        if self.sync_notified.swap(true, Ordering::Relaxed) {
+            return;
+        }
+
+        self.sync_ready.notify_one();
     }
 }
 

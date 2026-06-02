@@ -137,19 +137,23 @@ impl SqlxClient {
         native_tx_hashes: &[HashBytes],
         token_tx_hashes: &[HashBytes],
         message_hash: &HashBytes,
+        expired_at: u32,
     ) -> anyhow::Result<()> {
         let mut tx = self.pool.begin().await?;
+        let expired_at = BigDecimal::from(expired_at);
 
         for tx_hash in native_tx_hashes {
             let res = sqlx::query!(
                 r#"UPDATE transactions
                 SET status = 'Pending'::transaction_status,
                     sending_message_hash = $2,
+                    expired_at = $3,
                     updated_at = current_timestamp
                 WHERE transaction_hash = $1 AND status = 'New'::transaction_status
                 RETURNING transaction_hash"#,
                 tx_hash.to_string(),
                 message_hash.to_string(),
+                expired_at,
             )
             .fetch_optional(&mut *tx)
             .await?;
@@ -166,11 +170,13 @@ impl SqlxClient {
                 r#"UPDATE token_transfers
                 SET status = 'Pending'::transaction_status,
                     sending_message_hash = $2,
+                    expired_at = $3,
                     updated_at = current_timestamp
                 WHERE transaction_hash = $1 AND status = 'New'::transaction_status
                 RETURNING transaction_hash"#,
                 tx_hash.to_string(),
                 message_hash.to_string(),
+                expired_at,
             )
             .fetch_optional(&mut *tx)
             .await?;

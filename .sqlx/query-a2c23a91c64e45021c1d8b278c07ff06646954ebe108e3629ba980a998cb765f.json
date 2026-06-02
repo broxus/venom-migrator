@@ -1,0 +1,194 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n                transaction_hash,\n                transaction_lt,\n                transaction_time,\n                recipient_wc,\n                recipient_account,\n                value,\n                ticker,\n                source_token_root_wc,\n                source_token_root_account,\n                target_token_root_wc,\n                target_token_root_account,\n                source_token_wallet_wc,\n                source_token_wallet_account,\n                target_token_wallet_wc,\n                target_token_wallet_account\n            FROM token_transfers\n            WHERE status = 'New'::transaction_status\n            ORDER BY created_at, transaction_hash",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "transaction_hash",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "token_transfers",
+            "name": "transaction_hash"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "transaction_lt",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "token_transfers",
+            "name": "transaction_lt"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "transaction_time",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "token_transfers",
+            "name": "transaction_time"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "recipient_wc",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "token_transfers",
+            "name": "recipient_wc"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "recipient_account",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "token_transfers",
+            "name": "recipient_account"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "value",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "token_transfers",
+            "name": "value"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "ticker",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "token_transfers",
+            "name": "ticker"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "source_token_root_wc",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "token_transfers",
+            "name": "source_token_root_wc"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "source_token_root_account",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "token_transfers",
+            "name": "source_token_root_account"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "target_token_root_wc",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "token_transfers",
+            "name": "target_token_root_wc"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "target_token_root_account",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "token_transfers",
+            "name": "target_token_root_account"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "source_token_wallet_wc",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "token_transfers",
+            "name": "source_token_wallet_wc"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "source_token_wallet_account",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "token_transfers",
+            "name": "source_token_wallet_account"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "target_token_wallet_wc",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "token_transfers",
+            "name": "target_token_wallet_wc"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "target_token_wallet_account",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "token_transfers",
+            "name": "target_token_wallet_account"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "a2c23a91c64e45021c1d8b278c07ff06646954ebe108e3629ba980a998cb765f"
+}

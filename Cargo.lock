@@ -952,7 +952,7 @@ dependencies = [
 [[package]]
 name = "everscale-jrpc-transaction-consumer"
 version = "0.1.0"
-source = "git+https://github.com/broxus/jrpc-transaction-consumer#c86b99c88be62d144467df169577254a02df06ef"
+source = "git+https://github.com/broxus/jrpc-transaction-consumer#f3ffd6a5d55ad19f7ad900694695cd9e92c552d3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2070,6 +2070,7 @@ dependencies = [
 [[package]]
 name = "nekoton-core"
 version = "0.0.2"
+source = "git+https://github.com/broxus/tycho-nekoton.git#9e6876debc5682f7ab7155e576ee5f636e1cd68f"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2089,6 +2090,7 @@ dependencies = [
 [[package]]
 name = "nekoton-transport"
 version = "0.0.2"
+source = "git+https://github.com/broxus/tycho-nekoton.git#9e6876debc5682f7ab7155e576ee5f636e1cd68f"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2109,6 +2111,7 @@ dependencies = [
 [[package]]
 name = "nekoton-utils"
 version = "0.0.2"
+source = "git+https://github.com/broxus/tycho-nekoton.git#9e6876debc5682f7ab7155e576ee5f636e1cd68f"
 dependencies = [
  "ed25519-dalek",
  "hex",
@@ -3073,9 +3076,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.149"
+version = "1.0.150"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
+checksum = "e8014e44b4736ed0538adeecded0fce2a272f22dc9578a7eb6b2d9993c74cfb9"
 dependencies = [
  "itoa",
  "memchr",
@@ -4408,7 +4411,9 @@ dependencies = [
  "nekoton-transport",
  "num-traits",
  "parking_lot",
+ "rand 0.10.1",
  "serde",
+ "serde_json",
  "sqlx",
  "thiserror 2.0.18",
  "tikv-jemallocator",

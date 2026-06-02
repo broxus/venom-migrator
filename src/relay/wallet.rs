@@ -10,6 +10,7 @@ use tycho_types::abi::AbiValue;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes};
 use tycho_types::dict::Dict;
+use tycho_types::models::vm::SendMsgFlags;
 use tycho_types::models::{
     AccountState, CurrencyCollection, ExtInMsgInfo, IntAddr, MsgInfo, OwnedMessage,
     OwnedRelaxedMessage, RelaxedIntMsgInfo, RelaxedMsgInfo, SignatureContext, StateInit, StdAddr,
@@ -73,7 +74,7 @@ impl HighloadWallet {
             .into_iter()
             .map(|transfer| match transfer {
                 RelayTransfer::Native(transfer) => Ok(Gift {
-                    flags: 0,
+                    flags: SendMsgFlags::PAY_FEE_SEPARATELY.bits(),
                     bounce: false,
                     destination: transfer.recipient,
                     amount: transfer.amount,
@@ -95,7 +96,7 @@ impl HighloadWallet {
                         .build()?;
 
                     Ok(Gift {
-                        flags: 0,
+                        flags: SendMsgFlags::PAY_FEE_SEPARATELY.bits(),
                         bounce: true,
                         destination: transfer.target_token_wallet,
                         amount: DEFAULT_TOKEN_TRANSFER_VALUE,

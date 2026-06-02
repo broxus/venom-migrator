@@ -36,7 +36,7 @@ pub async fn run(
     let transaction_consumer = JrpcTransactionConsumer::from_jrpc(
         config.venom_rpc.clone(),
         sqlx_client.pg_pool(),
-        config.transaction_consumer.clone().into(),
+        config.transaction_consumer,
     )
     .await?;
 
@@ -106,7 +106,7 @@ impl TxHandler {
     ) -> anyhow::Result<Self> {
         let venom_ctx = {
             let endpoint = config.venom_rpc.parse()?;
-            let transport = RpcTransport::new([endpoint], Default::default(), true).await?;
+            let transport = RpcTransport::new([endpoint], Default::default(), false).await?;
 
             let blockchain_config = transport.get_config().await?.config;
 
@@ -118,7 +118,7 @@ impl TxHandler {
 
         let (tycho_transport, tycho_ctx) = {
             let endpoint = config.tycho_rpc.parse()?;
-            let transport = RpcTransport::new([endpoint], Default::default(), true).await?;
+            let transport = RpcTransport::new([endpoint], Default::default(), false).await?;
 
             let blockchain_config = transport.get_config().await?.config;
 
@@ -136,6 +136,12 @@ impl TxHandler {
             pending_messages,
             Tokens::new(config.wallet.min_required_balance),
         )?;
+        anyhow::ensure!(
+            *wallet.address() == config.wallet.address,
+            "wallet address mismatch: expected={}, got={}",
+            config.wallet.address,
+            wallet.address(),
+        );
 
         anyhow::ensure!(
             config.wallet.transfer_batch_size <= wallet::MAX_GIFTS,
@@ -158,14 +164,14 @@ impl TxHandler {
             let source_ticker = source_contract.symbol()?;
             let target_ticker = target_contract.symbol()?;
 
-            anyhow::ensure!(
-                source_ticker == target_ticker,
-                "token route ticker mismatch: source_root={}, target_root={}, source_ticker={}, target_ticker={}",
-                route.source_root,
-                route.target_root,
-                source_ticker,
-                target_ticker,
-            );
+            // anyhow::ensure!(
+            //     source_ticker == target_ticker,
+            //     "token route ticker mismatch: source_root={}, target_root={}, source_ticker={}, target_ticker={}",
+            //     route.source_root,
+            //     route.target_root,
+            //     source_ticker,
+            //     target_ticker,
+            // );
 
             tokens.insert(
                 source_token_wallet.clone(),
@@ -316,7 +322,7 @@ impl TxHandler {
         let msg_hash = *CellBuilder::build_from(&msg.message)?.repr_hash();
 
         self.sqlx_client
-            .mark_relay_transfers_pending(&native_hashes, &token_hashes, &msg_hash)
+            .mark_relay_transfers_pending(&native_hashes, &token_hashes, &msg_hash, msg.expire_at)
             .await?;
 
         match self

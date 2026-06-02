@@ -4,6 +4,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 mod cmd {
+    pub mod account;
     pub mod run;
 }
 
@@ -41,6 +42,7 @@ pub struct App {
 impl App {
     pub fn run(self) -> Result<()> {
         match self.cmd {
+            SubCmd::Account(cmd) => cmd.run(),
             SubCmd::Run(cmd) => cmd.run(),
         }
     }
@@ -48,5 +50,6 @@ impl App {
 
 #[derive(Subcommand)]
 enum SubCmd {
+    Account(cmd::account::Cmd),
     Run(cmd::run::Cmd),
 }

@@ -17,6 +17,7 @@ CREATE TABLE token_transfers
     target_token_wallet_account VARCHAR(64)        NOT NULL,
     status                      transaction_status NOT NULL,
     sending_message_hash        VARCHAR(64),
+    expired_at                  NUMERIC,
     sent_transaction_hash       VARCHAR(64),
     created_at                  TIMESTAMP          NOT NULL DEFAULT current_timestamp,
     updated_at                  TIMESTAMP          NOT NULL DEFAULT current_timestamp,

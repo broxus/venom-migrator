@@ -16,6 +16,7 @@ pub enum RelayTransfer {
 #[derive(Debug, Clone)]
 pub struct NativeTransfer {
     pub tx_hash: HashBytes,
+    pub sender: StdAddr,
     pub recipient: StdAddr,
     pub amount: u128,
     pub lt: u64,
@@ -30,6 +31,7 @@ pub struct TokenTransfer {
     pub source_token_wallet: StdAddr,
     pub target_token_wallet: StdAddr,
     pub ticker: String,
+    pub sender: StdAddr,
     pub recipient: StdAddr,
     pub amount: u128,
     pub lt: u64,

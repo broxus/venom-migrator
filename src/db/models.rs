@@ -10,6 +10,8 @@ pub struct NativeTransferFromDb {
     pub transaction_hash: String,
     pub transaction_lt: BigDecimal,
     pub transaction_time: BigDecimal,
+    pub sender_wc: i32,
+    pub sender_account: String,
     pub recipient_wc: i32,
     pub recipient_account: String,
     pub value: BigDecimal,
@@ -21,6 +23,10 @@ impl TryFrom<NativeTransferFromDb> for NativeTransfer {
     fn try_from(value: NativeTransferFromDb) -> Result<Self, Self::Error> {
         Ok(Self {
             tx_hash: HashBytes::from_str(&value.transaction_hash)?,
+            sender: StdAddr::new(
+                i8::try_from(value.sender_wc)?,
+                HashBytes::from_str(&value.sender_account).context("invalid sender")?,
+            ),
             recipient: StdAddr::new(
                 i8::try_from(value.recipient_wc)?,
                 HashBytes::from_str(&value.recipient_account).context("invalid recipient")?,
@@ -42,6 +48,8 @@ pub struct TokenTransferFromDb {
     pub transaction_hash: String,
     pub transaction_lt: BigDecimal,
     pub transaction_time: BigDecimal,
+    pub sender_wc: i32,
+    pub sender_account: String,
     pub recipient_wc: i32,
     pub recipient_account: String,
     pub value: BigDecimal,
@@ -84,6 +92,10 @@ impl TryFrom<TokenTransferFromDb> for TokenTransfer {
                     .context("invalid target token wallet")?,
             ),
             ticker: value.ticker,
+            sender: StdAddr::new(
+                i8::try_from(value.sender_wc)?,
+                HashBytes::from_str(&value.sender_account).context("invalid sender")?,
+            ),
             recipient: StdAddr::new(
                 i8::try_from(value.recipient_wc)?,
                 HashBytes::from_str(&value.recipient_account).context("invalid recipient")?,

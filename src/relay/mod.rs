@@ -1,3 +1,4 @@
+use std::str::FromStr;
 use std::sync::Arc;
 
 use crate::db::SqlxClient;
@@ -9,7 +10,7 @@ use futures_util::StreamExt;
 use nekoton_core::contracts::blockchain_context::BlockchainContextBuilder;
 use nekoton_core::transport::Transport;
 use nekoton_transport::rpc::RpcTransport;
-use tycho_types::cell::{CellBuilder, HashBytes};
+use tycho_types::cell::{Cell, CellBuilder, CellSlice, DynCell, HashBytes};
 use tycho_types::models::{MsgInfo, StdAddr, Transaction, TxInfo};
 use tycho_types::num::Tokens;
 use tycho_util::FastHashMap;
@@ -170,7 +171,7 @@ impl TxHandler {
             //     route.source_root,
             //     route.target_root,
             //     source_ticker,
-            //     target_ticker,
+            //     target_ticker,я думал там в количестве выполненых инструкций считается
             // );
 
             tokens.insert(
@@ -235,7 +236,9 @@ impl TxHandler {
         }
 
         if account == &self.owner {
-            let Some(parsed) = self.parse_native_transfer(account, tx, tx_hash, header) else {
+            let Some(parsed) =
+                self.parse_native_transfer(account, tx, tx_hash, header, in_msg.body)
+            else {
                 return Ok(TxHandleStatus::Skipped);
             };
 
@@ -347,6 +350,7 @@ impl TxHandler {
         tx: &Transaction,
         tx_hash: HashBytes,
         header: &tycho_types::models::IntMsgInfo,
+        body: CellSlice<'_>,
     ) -> Option<NativeTransfer> {
         let dst = header.dst.as_std()?;
 
@@ -354,7 +358,8 @@ impl TxHandler {
             return None;
         }
 
-        let recipient = header.src.as_std().cloned()?;
+        let sender = header.src.as_std().cloned()?;
+        let recipient = parse_recipient_comment(body)?;
 
         let amount = header.value.tokens.into_inner();
 
@@ -364,6 +369,7 @@ impl TxHandler {
 
         Some(NativeTransfer {
             tx_hash,
+            sender,
             recipient,
             amount,
             lt: tx.lt,
@@ -388,6 +394,8 @@ impl TxHandler {
             return None;
         }
 
+        let recipient = parse_recipient_comment_cell(&transfer.payload)?;
+
         Some(TokenTransfer {
             tx_hash,
             source_token_root: token_wallet.source_root.clone(),
@@ -395,11 +403,50 @@ impl TxHandler {
             source_token_wallet: token_wallet.source_token_wallet.clone(),
             target_token_wallet: token_wallet.target_token_wallet.clone(),
             ticker: token_wallet.ticker.clone(),
-            recipient: transfer.sender,
+            sender: transfer.sender,
+            recipient,
             amount: transfer.amount,
             lt: tx.lt,
             now: tx.now,
         })
+    }
+}
+
+fn parse_recipient_comment_cell(payload: &Cell) -> Option<StdAddr> {
+    parse_recipient_comment(payload.as_slice().ok()?)
+}
+
+fn parse_recipient_comment(payload: CellSlice<'_>) -> Option<StdAddr> {
+    let comment = parse_comment_payload(payload)?;
+    StdAddr::from_str(comment.trim()).ok()
+}
+
+fn parse_comment_payload(mut payload: CellSlice<'_>) -> Option<String> {
+    if payload.load_u32().ok()? != 0 {
+        return None;
+    }
+
+    let cell = payload.load_reference().ok()?;
+    let data = load_string_chain(cell)?;
+
+    String::from_utf8(data).ok()
+}
+
+fn load_string_chain(mut cell: &DynCell) -> Option<Vec<u8>> {
+    let mut data = Vec::new();
+
+    loop {
+        if cell.bit_len() % 8 != 0 {
+            return None;
+        }
+
+        data.extend_from_slice(cell.data());
+
+        let Some(child) = cell.reference(0) else {
+            return Some(data);
+        };
+
+        cell = child;
     }
 }
 

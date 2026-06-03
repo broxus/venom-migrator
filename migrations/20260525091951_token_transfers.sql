@@ -3,6 +3,8 @@ CREATE TABLE token_transfers
     transaction_hash            VARCHAR(64)        NOT NULL,
     transaction_lt              NUMERIC            NOT NULL,
     transaction_time            NUMERIC            NOT NULL,
+    sender_wc                   INT                NOT NULL,
+    sender_account              VARCHAR(64)        NOT NULL,
     recipient_wc                INT                NOT NULL,
     recipient_account           VARCHAR(64)        NOT NULL,
     value                       NUMERIC            NOT NULL,

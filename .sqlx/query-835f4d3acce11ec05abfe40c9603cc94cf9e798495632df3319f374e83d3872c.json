@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE transfers\n                SET status = 'Failed'::transaction_status,\n                    updated_at = current_timestamp\n                WHERE sending_message_hash = $1\n                    AND status IN ('Pending'::transaction_status, 'Failed'::transaction_status)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "835f4d3acce11ec05abfe40c9603cc94cf9e798495632df3319f374e83d3872c"
+}

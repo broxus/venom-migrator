@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT\n                transaction_hash,\n                transaction_lt,\n                transaction_time,\n                recipient_wc,\n                recipient_account,\n                value\n            FROM transactions\n            WHERE status = 'New'::transaction_status\n            ORDER BY created_at, transaction_hash",
+  "query": "SELECT\n                transaction_hash,\n                transaction_lt,\n                transaction_time,\n                sender_wc,\n                sender_account,\n                recipient_wc,\n                recipient_account,\n                value\n            FROM transfers\n            WHERE status = 'New'::transaction_status\n            ORDER BY created_at, transaction_hash",
   "describe": {
     "columns": [
       {
@@ -9,7 +9,7 @@
         "type_info": "Varchar",
         "origin": {
           "Table": {
-            "table": "transactions",
+            "table": "transfers",
             "name": "transaction_hash"
           }
         }
@@ -20,7 +20,7 @@
         "type_info": "Numeric",
         "origin": {
           "Table": {
-            "table": "transactions",
+            "table": "transfers",
             "name": "transaction_lt"
           }
         }
@@ -31,40 +31,62 @@
         "type_info": "Numeric",
         "origin": {
           "Table": {
-            "table": "transactions",
+            "table": "transfers",
             "name": "transaction_time"
           }
         }
       },
       {
         "ordinal": 3,
-        "name": "recipient_wc",
+        "name": "sender_wc",
         "type_info": "Int4",
         "origin": {
           "Table": {
-            "table": "transactions",
-            "name": "recipient_wc"
+            "table": "transfers",
+            "name": "sender_wc"
           }
         }
       },
       {
         "ordinal": 4,
-        "name": "recipient_account",
+        "name": "sender_account",
         "type_info": "Varchar",
         "origin": {
           "Table": {
-            "table": "transactions",
-            "name": "recipient_account"
+            "table": "transfers",
+            "name": "sender_account"
           }
         }
       },
       {
         "ordinal": 5,
+        "name": "recipient_wc",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "transfers",
+            "name": "recipient_wc"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "recipient_account",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "transfers",
+            "name": "recipient_account"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
         "name": "value",
         "type_info": "Numeric",
         "origin": {
           "Table": {
-            "table": "transactions",
+            "table": "transfers",
             "name": "value"
           }
         }
@@ -79,8 +101,10 @@
       false,
       false,
       false,
+      false,
+      false,
       false
     ]
   },
-  "hash": "53699b4f4dcb24049743ef359239fff7c8a4e63da3f708e805acd24138b2725a"
+  "hash": "9eeb3389b561afabb272e414d6b683a16ceda9770c71186494938fde70187b4f"
 }

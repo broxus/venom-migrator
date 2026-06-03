@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT\n                transaction_hash,\n                transaction_lt,\n                transaction_time,\n                recipient_wc,\n                recipient_account,\n                value,\n                ticker,\n                source_token_root_wc,\n                source_token_root_account,\n                target_token_root_wc,\n                target_token_root_account,\n                source_token_wallet_wc,\n                source_token_wallet_account,\n                target_token_wallet_wc,\n                target_token_wallet_account\n            FROM token_transfers\n            WHERE status = 'New'::transaction_status\n            ORDER BY created_at, transaction_hash",
+  "query": "SELECT\n                transaction_hash,\n                transaction_lt,\n                transaction_time,\n                sender_wc,\n                sender_account,\n                recipient_wc,\n                recipient_account,\n                value,\n                ticker,\n                source_token_root_wc,\n                source_token_root_account,\n                target_token_root_wc,\n                target_token_root_account,\n                source_token_wallet_wc,\n                source_token_wallet_account,\n                target_token_wallet_wc,\n                target_token_wallet_account\n            FROM token_transfers\n            WHERE status = 'New'::transaction_status\n            ORDER BY created_at, transaction_hash",
   "describe": {
     "columns": [
       {
@@ -38,6 +38,28 @@
       },
       {
         "ordinal": 3,
+        "name": "sender_wc",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "token_transfers",
+            "name": "sender_wc"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "sender_account",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "token_transfers",
+            "name": "sender_account"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
         "name": "recipient_wc",
         "type_info": "Int4",
         "origin": {
@@ -48,7 +70,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 6,
         "name": "recipient_account",
         "type_info": "Varchar",
         "origin": {
@@ -59,7 +81,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 7,
         "name": "value",
         "type_info": "Numeric",
         "origin": {
@@ -70,7 +92,7 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 8,
         "name": "ticker",
         "type_info": "Varchar",
         "origin": {
@@ -81,7 +103,7 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 9,
         "name": "source_token_root_wc",
         "type_info": "Int4",
         "origin": {
@@ -92,7 +114,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 10,
         "name": "source_token_root_account",
         "type_info": "Varchar",
         "origin": {
@@ -103,7 +125,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 11,
         "name": "target_token_root_wc",
         "type_info": "Int4",
         "origin": {
@@ -114,7 +136,7 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 12,
         "name": "target_token_root_account",
         "type_info": "Varchar",
         "origin": {
@@ -125,7 +147,7 @@
         }
       },
       {
-        "ordinal": 11,
+        "ordinal": 13,
         "name": "source_token_wallet_wc",
         "type_info": "Int4",
         "origin": {
@@ -136,7 +158,7 @@
         }
       },
       {
-        "ordinal": 12,
+        "ordinal": 14,
         "name": "source_token_wallet_account",
         "type_info": "Varchar",
         "origin": {
@@ -147,7 +169,7 @@
         }
       },
       {
-        "ordinal": 13,
+        "ordinal": 15,
         "name": "target_token_wallet_wc",
         "type_info": "Int4",
         "origin": {
@@ -158,7 +180,7 @@
         }
       },
       {
-        "ordinal": 14,
+        "ordinal": 16,
         "name": "target_token_wallet_account",
         "type_info": "Varchar",
         "origin": {
@@ -187,8 +209,10 @@
       false,
       false,
       false,
+      false,
+      false,
       false
     ]
   },
-  "hash": "a2c23a91c64e45021c1d8b278c07ff06646954ebe108e3629ba980a998cb765f"
+  "hash": "e4cdc8534830a409b8e94c791953323eb4784dbe5e85b068ac661e33811710b4"
 }

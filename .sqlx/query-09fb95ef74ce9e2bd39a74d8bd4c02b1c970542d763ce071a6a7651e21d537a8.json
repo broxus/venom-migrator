@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO transfers (\n                transaction_hash,\n                transaction_lt,\n                transaction_time,\n                sender_wc,\n                sender_account,\n                recipient_wc,\n                recipient_account,\n                value,\n                status\n            )\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'New'::transaction_status)\n            ON CONFLICT DO NOTHING\n            RETURNING transaction_hash",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "transaction_hash",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "transfers",
+            "name": "transaction_hash"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Numeric",
+        "Numeric",
+        "Int4",
+        "Varchar",
+        "Int4",
+        "Varchar",
+        "Numeric"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "09fb95ef74ce9e2bd39a74d8bd4c02b1c970542d763ce071a6a7651e21d537a8"
+}

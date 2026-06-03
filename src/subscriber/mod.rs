@@ -1,7 +1,8 @@
-use anyhow::Result;
-use futures_util::future::BoxFuture;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+
+use anyhow::Result;
+use futures_util::future::BoxFuture;
 use tokio::sync::Notify;
 use tycho_core::block_strider::{BlockSubscriber, BlockSubscriberContext};
 use tycho_types::cell::{CellSlice, HashBytes};

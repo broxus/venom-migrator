@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n                transaction_hash,\n                sending_message_hash as \"sending_message_hash!\",\n                expired_at as \"expired_at!\"\n            FROM transfers\n            WHERE status = 'Pending'::transaction_status\n                AND sending_message_hash IS NOT NULL\n                AND expired_at IS NOT NULL\n            ORDER BY created_at, transaction_hash",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "transaction_hash",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "transfers",
+            "name": "transaction_hash"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "sending_message_hash!",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "transfers",
+            "name": "sending_message_hash"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "expired_at!",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "transfers",
+            "name": "expired_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "14cc4e18ccfbcf209217defb4bc523201f73e640b5cd2a4474f8ff67e4c8a619"
+}

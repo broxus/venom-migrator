@@ -1,7 +1,6 @@
-use std::str::FromStr;
 use std::sync::Arc;
 
-use crate::db::SqlxClient;
+use crate::db::{PendingRelayMessage, SqlxClient};
 use ed25519_dalek::SigningKey;
 use everscale_jrpc_transaction_consumer::{
     ConsumedTransaction, TransactionConsumer as JrpcTransactionConsumer,
@@ -10,7 +9,7 @@ use futures_util::StreamExt;
 use nekoton_core::contracts::blockchain_context::BlockchainContextBuilder;
 use nekoton_core::transport::Transport;
 use nekoton_transport::rpc::RpcTransport;
-use tycho_types::cell::{Cell, CellBuilder, CellSlice, DynCell, HashBytes};
+use tycho_types::cell::{CellBuilder, CellSlice, HashBytes};
 use tycho_types::models::{MsgInfo, StdAddr, Transaction, TxInfo};
 use tycho_types::num::Tokens;
 use tycho_util::FastHashMap;
@@ -25,7 +24,9 @@ use crate::relay::models::{
 };
 use crate::relay::wallet::HighloadWallet;
 use crate::utils::abi::UnpackAbiPlain;
-use crate::utils::pending_messages::{MessageStatus, PendingMessages};
+use crate::utils::background_task::spawn_background_task;
+use crate::utils::comment_parser;
+use crate::utils::pending_messages::{MessageStatus, MessageStatusRx, PendingMessages};
 use crate::utils::token_wallets;
 use crate::utils::token_wallets::models::RootTokenContract;
 
@@ -42,6 +43,7 @@ pub async fn run(
     .await?;
 
     let mut tx_handler = TxHandler::new(config, sqlx_client, pending_messages).await?;
+    tx_handler.recover_pending_messages().await?;
     tx_handler.recover_new_transfers().await?;
 
     let mut flush_interval = tokio::time::interval(config.wallet.transfer_batch_flush_interval);
@@ -95,6 +97,7 @@ struct TxHandler {
     owner: StdAddr,
     wallet: HighloadWallet,
     sqlx_client: SqlxClient,
+    pending_messages: PendingMessages,
     batch: TxBatch,
     tokens: FastHashMap<StdAddr, TokenWalletInfo>,
 }
@@ -134,7 +137,7 @@ impl TxHandler {
         let wallet = HighloadWallet::new(
             Arc::new(SigningKey::from_bytes(config.wallet.secret.as_array())),
             tycho_transport.clone(),
-            pending_messages,
+            pending_messages.clone(),
             Tokens::new(config.wallet.min_required_balance),
         )?;
         anyhow::ensure!(
@@ -191,6 +194,7 @@ impl TxHandler {
             tokens,
             wallet,
             sqlx_client,
+            pending_messages,
             batch: TxBatch::new(config.wallet.transfer_batch_size),
         })
     }
@@ -280,6 +284,39 @@ impl TxHandler {
         self.batch.is_full()
     }
 
+    async fn recover_pending_messages(&self) -> anyhow::Result<()> {
+        let messages = self.sqlx_client.load_pending_relay_messages().await?;
+        if messages.is_empty() {
+            return Ok(());
+        }
+
+        tracing::info!(
+            count = messages.len(),
+            "recovering pending relay messages from database"
+        );
+
+        for message in messages {
+            self.recover_pending_message(message)?;
+        }
+
+        Ok(())
+    }
+
+    fn recover_pending_message(&self, message: PendingRelayMessage) -> anyhow::Result<()> {
+        let rx = self.pending_messages.add_message(
+            self.wallet.address().address,
+            message.message_hash,
+            message.expired_at,
+        )?;
+
+        spawn_background_task(
+            "Wait pending relay message",
+            wait_pending_message(self.sqlx_client.clone(), message, rx),
+        );
+
+        Ok(())
+    }
+
     async fn recover_new_transfers(&mut self) -> anyhow::Result<()> {
         let transfers = self.sqlx_client.load_new_relay_transfers().await?;
         if transfers.is_empty() {
@@ -359,7 +396,7 @@ impl TxHandler {
         }
 
         let sender = header.src.as_std().cloned()?;
-        let recipient = parse_recipient_comment(body)?;
+        let recipient = comment_parser::parse_recipient_address(body)?;
 
         let amount = header.value.tokens.into_inner();
 
@@ -394,7 +431,7 @@ impl TxHandler {
             return None;
         }
 
-        let recipient = parse_recipient_comment_cell(&transfer.payload)?;
+        let recipient = comment_parser::parse_recipient_address(transfer.payload.as_slice().ok()?)?;
 
         Some(TokenTransfer {
             tx_hash,
@@ -412,42 +449,30 @@ impl TxHandler {
     }
 }
 
-fn parse_recipient_comment_cell(payload: &Cell) -> Option<StdAddr> {
-    parse_recipient_comment(payload.as_slice().ok()?)
-}
-
-fn parse_recipient_comment(payload: CellSlice<'_>) -> Option<StdAddr> {
-    let comment = parse_comment_payload(payload)?;
-    StdAddr::from_str(comment.trim()).ok()
-}
-
-fn parse_comment_payload(mut payload: CellSlice<'_>) -> Option<String> {
-    if payload.load_u32().ok()? != 0 {
-        return None;
-    }
-
-    let cell = payload.load_reference().ok()?;
-    let data = load_string_chain(cell)?;
-
-    String::from_utf8(data).ok()
-}
-
-fn load_string_chain(mut cell: &DynCell) -> Option<Vec<u8>> {
-    let mut data = Vec::new();
-
-    loop {
-        if cell.bit_len() % 8 != 0 {
-            return None;
+async fn wait_pending_message(
+    sqlx_client: SqlxClient,
+    message: PendingRelayMessage,
+    rx: MessageStatusRx,
+) -> anyhow::Result<()> {
+    match rx.await? {
+        MessageStatus::Delivered => {
+            tracing::info!(
+                message_hash = %message.message_hash,
+                "recovered pending relay message delivered"
+            );
         }
-
-        data.extend_from_slice(cell.data());
-
-        let Some(child) = cell.reference(0) else {
-            return Some(data);
-        };
-
-        cell = child;
+        MessageStatus::Expired => {
+            sqlx_client
+                .mark_relay_transfers_expired(
+                    &message.native_tx_hashes,
+                    &message.token_tx_hashes,
+                    &message.message_hash,
+                )
+                .await?;
+        }
     }
+
+    Ok(())
 }
 
 struct TxBatch {

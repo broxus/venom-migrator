@@ -1,11 +1,63 @@
+use std::collections::HashMap;
+use std::collections::hash_map;
+use std::str::FromStr;
+
+use anyhow::Context;
 use bigdecimal::BigDecimal;
+use num_traits::ToPrimitive;
 use tycho_types::cell::HashBytes;
 
-use crate::db::models::{NativeTransferFromDb, TokenTransferFromDb};
+use crate::db::models::{
+    NativeTransferFromDb, PendingRelayMessage, PendingTransferFromDb, TokenTransferFromDb,
+};
 use crate::db::{SqlxClient, TransferConfirmation};
 use crate::relay::models::{NativeTransfer, RelayTransfer, TokenTransfer};
 
 impl SqlxClient {
+    pub async fn load_pending_relay_messages(&self) -> anyhow::Result<Vec<PendingRelayMessage>> {
+        let native = sqlx::query_as!(
+            PendingTransferFromDb,
+            r#"SELECT
+                transaction_hash,
+                sending_message_hash as "sending_message_hash!",
+                expired_at as "expired_at!"
+            FROM transfers
+            WHERE status = 'Pending'::transaction_status
+                AND sending_message_hash IS NOT NULL
+                AND expired_at IS NOT NULL
+            ORDER BY created_at, transaction_hash"#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let token = sqlx::query_as!(
+            PendingTransferFromDb,
+            r#"SELECT
+                transaction_hash,
+                sending_message_hash as "sending_message_hash!",
+                expired_at as "expired_at!"
+            FROM token_transfers
+            WHERE status = 'Pending'::transaction_status
+                AND sending_message_hash IS NOT NULL
+                AND expired_at IS NOT NULL
+            ORDER BY created_at, transaction_hash"#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut messages = Vec::new();
+        let mut indexes = HashMap::new();
+
+        for transfer in native {
+            push_pending_transfer(&mut messages, &mut indexes, transfer, false)?;
+        }
+        for transfer in token {
+            push_pending_transfer(&mut messages, &mut indexes, transfer, true)?;
+        }
+
+        Ok(messages)
+    }
+
     pub async fn load_new_relay_transfers(&self) -> anyhow::Result<Vec<RelayTransfer>> {
         let native = sqlx::query_as!(
             NativeTransferFromDb,
@@ -418,4 +470,50 @@ impl SqlxClient {
 
         Ok(())
     }
+}
+
+fn push_pending_transfer(
+    messages: &mut Vec<PendingRelayMessage>,
+    indexes: &mut HashMap<HashBytes, usize>,
+    transfer: PendingTransferFromDb,
+    is_token: bool,
+) -> anyhow::Result<()> {
+    let message_hash = HashBytes::from_str(&transfer.sending_message_hash)
+        .context("invalid pending message hash")?;
+    let tx_hash =
+        HashBytes::from_str(&transfer.transaction_hash).context("invalid pending tx hash")?;
+    let expired_at = transfer
+        .expired_at
+        .to_u32()
+        .context("invalid pending expired_at")?;
+
+    let message = match indexes.entry(message_hash) {
+        hash_map::Entry::Occupied(entry) => {
+            let message = &mut messages[*entry.get()];
+            anyhow::ensure!(
+                message.expired_at == expired_at,
+                "pending transfers for the same message have different expired_at"
+            );
+            message
+        }
+        hash_map::Entry::Vacant(entry) => {
+            let index = messages.len();
+            entry.insert(index);
+            messages.push(PendingRelayMessage {
+                message_hash,
+                expired_at,
+                native_tx_hashes: Vec::new(),
+                token_tx_hashes: Vec::new(),
+            });
+            &mut messages[index]
+        }
+    };
+
+    if is_token {
+        message.token_tx_hashes.push(tx_hash);
+    } else {
+        message.native_tx_hashes.push(tx_hash);
+    }
+
+    Ok(())
 }

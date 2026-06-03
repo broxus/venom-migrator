@@ -6,6 +6,25 @@ use std::str::FromStr;
 use tycho_types::cell::HashBytes;
 use tycho_types::models::StdAddr;
 
+pub struct PendingRelayMessage {
+    pub message_hash: HashBytes,
+    pub expired_at: u32,
+    pub native_tx_hashes: Vec<HashBytes>,
+    pub token_tx_hashes: Vec<HashBytes>,
+}
+
+pub struct TransferConfirmation {
+    pub tx_hash: HashBytes,
+    pub msg_hash: HashBytes,
+    pub source_tx_hash: HashBytes,
+}
+
+pub struct PendingTransferFromDb {
+    pub transaction_hash: String,
+    pub sending_message_hash: String,
+    pub expired_at: BigDecimal,
+}
+
 pub struct NativeTransferFromDb {
     pub transaction_hash: String,
     pub transaction_lt: BigDecimal,

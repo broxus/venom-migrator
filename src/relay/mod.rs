@@ -9,6 +9,7 @@ use futures_util::StreamExt;
 use nekoton_core::contracts::blockchain_context::BlockchainContextBuilder;
 use nekoton_core::transport::Transport;
 use nekoton_transport::rpc::RpcTransport;
+use tycho_types::boc::Boc;
 use tycho_types::cell::{CellBuilder, CellSlice, HashBytes};
 use tycho_types::models::{MsgInfo, StdAddr, Transaction, TxInfo};
 use tycho_types::num::Tokens;
@@ -20,7 +21,7 @@ pub mod wallet;
 
 use crate::relay::config::RelayConfig;
 use crate::relay::models::{
-    NativeTransfer, RelayTransfer, TokenTransfer, TokenWalletInfo, TxHandleStatus,
+    NativeTransfer, RawTransaction, RelayTransfer, TokenTransfer, TokenWalletInfo, TxHandleStatus,
 };
 use crate::relay::wallet::HighloadWallet;
 use crate::utils::abi::UnpackAbiPlain;
@@ -68,10 +69,18 @@ pub async fn run(
                 };
 
                 match tx_handler.parse(&raw_transaction).await {
-                    Ok(TxHandleStatus::Skipped) => {
+                    Ok(TxHandleStatus::Skipped { raw, reason }) => {
+                        tx_handler
+                            .upsert_raw_transaction(&raw, "Skipped", Some(reason))
+                            .await?;
+
                         raw_transaction.commit().await?;
                     }
-                    Ok(TxHandleStatus::Parsed(transfer)) => {
+                    Ok(TxHandleStatus::Parsed { raw, transfer }) => {
+                        tx_handler
+                            .upsert_raw_transaction(&raw, "Parsed", None)
+                            .await?;
+
                         let is_new = tx_handler.create_transfer_in_db(&transfer).await?;
                         if is_new {
                             tx_handler.push(*transfer);
@@ -218,51 +227,84 @@ impl TxHandler {
 
         let cell = CellBuilder::build_from(tx)?;
         let tx_hash = *cell.repr_hash();
+        let raw = RawTransaction {
+            tx_hash,
+            account: account.clone(),
+            boc: Boc::encode(cell.as_ref()),
+            lt: tx.lt,
+            now: tx.now,
+        };
 
         let TxInfo::Ordinary(info) = tx.load_info()? else {
-            return Ok(TxHandleStatus::Skipped);
+            return Ok(TxHandleStatus::Skipped {
+                raw,
+                reason: "not ordinary",
+            });
         };
 
         if info.aborted {
-            return Ok(TxHandleStatus::Skipped);
+            return Ok(TxHandleStatus::Skipped {
+                raw,
+                reason: "aborted",
+            });
         }
 
         let Some(in_msg) = tx.load_in_msg()? else {
-            return Ok(TxHandleStatus::Skipped);
+            return Ok(TxHandleStatus::Skipped {
+                raw,
+                reason: "not in_msg",
+            });
         };
 
         let MsgInfo::Int(header) = &in_msg.info else {
-            return Ok(TxHandleStatus::Skipped);
+            return Ok(TxHandleStatus::Skipped {
+                raw,
+                reason: "not internal_in_msg",
+            });
         };
 
         if header.bounced {
-            return Ok(TxHandleStatus::Skipped);
+            return Ok(TxHandleStatus::Skipped {
+                raw,
+                reason: "bounced",
+            });
         }
 
         if account == &self.owner {
             let Some(parsed) =
                 self.parse_native_transfer(account, tx, tx_hash, header, in_msg.body)
             else {
-                return Ok(TxHandleStatus::Skipped);
+                return Ok(TxHandleStatus::Skipped {
+                    raw,
+                    reason: "not native transfer",
+                });
             };
 
-            return Ok(TxHandleStatus::Parsed(Box::new(RelayTransfer::Native(
-                Box::new(parsed),
-            ))));
+            return Ok(TxHandleStatus::Parsed {
+                raw,
+                transfer: Box::new(RelayTransfer::Native(Box::new(parsed))),
+            });
         }
 
         if let Some(token_info) = self.tokens.get(account) {
             let Some(parsed) = self.parse_token_transfer(tx, tx_hash, token_info, in_msg.body)
             else {
-                return Ok(TxHandleStatus::Skipped);
+                return Ok(TxHandleStatus::Skipped {
+                    raw,
+                    reason: "not token transfer",
+                });
             };
 
-            return Ok(TxHandleStatus::Parsed(Box::new(RelayTransfer::Token(
-                Box::new(parsed),
-            ))));
+            return Ok(TxHandleStatus::Parsed {
+                raw,
+                transfer: Box::new(RelayTransfer::Token(Box::new(parsed))),
+            });
         };
 
-        Ok(TxHandleStatus::Skipped)
+        Ok(TxHandleStatus::Skipped {
+            raw,
+            reason: "not subscribed account",
+        })
     }
 
     fn push(&mut self, transfer: RelayTransfer) {
@@ -278,6 +320,17 @@ impl TxHandler {
         };
 
         Ok(is_new)
+    }
+
+    async fn upsert_raw_transaction(
+        &self,
+        raw: &RawTransaction,
+        status: &str,
+        skip_reason: Option<&str>,
+    ) -> anyhow::Result<()> {
+        self.sqlx_client
+            .upsert_raw_transaction(raw, status, skip_reason)
+            .await
     }
 
     fn is_batch_full(&self) -> bool {

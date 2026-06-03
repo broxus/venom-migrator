@@ -11,9 +11,51 @@ use crate::db::models::{
     NativeTransferFromDb, PendingRelayMessage, PendingTransferFromDb, TokenTransferFromDb,
 };
 use crate::db::{SqlxClient, TransferConfirmation};
-use crate::relay::models::{NativeTransfer, RelayTransfer, TokenTransfer};
+use crate::relay::models::{NativeTransfer, RawTransaction, RelayTransfer, TokenTransfer};
 
 impl SqlxClient {
+    pub async fn upsert_raw_transaction(
+        &self,
+        payload: &RawTransaction,
+        status: &str,
+        skip_reason: Option<&str>,
+    ) -> anyhow::Result<()> {
+        sqlx::query!(
+            r#"INSERT INTO raw_transactions (
+                transaction_hash,
+                transaction_lt,
+                transaction_time,
+                account_wc,
+                account,
+                transaction_boc,
+                status,
+                skip_reason
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            ON CONFLICT (transaction_hash) DO UPDATE SET
+                transaction_lt = EXCLUDED.transaction_lt,
+                transaction_time = EXCLUDED.transaction_time,
+                account_wc = EXCLUDED.account_wc,
+                account = EXCLUDED.account,
+                transaction_boc = EXCLUDED.transaction_boc,
+                status = EXCLUDED.status,
+                skip_reason = EXCLUDED.skip_reason,
+                updated_at = current_timestamp"#,
+            payload.tx_hash.to_string(),
+            BigDecimal::from(payload.lt),
+            BigDecimal::from(payload.now),
+            payload.account.workchain as i32,
+            payload.account.address.to_string(),
+            payload.boc.as_slice(),
+            status,
+            skip_reason,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
     pub async fn load_pending_relay_messages(&self) -> anyhow::Result<Vec<PendingRelayMessage>> {
         let native = sqlx::query_as!(
             PendingTransferFromDb,

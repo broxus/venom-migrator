@@ -3,14 +3,29 @@ use tycho_types::models::StdAddr;
 
 #[derive(Debug, Clone)]
 pub enum TxHandleStatus {
-    Parsed(Box<RelayTransfer>),
-    Skipped,
+    Parsed {
+        raw: RawTransaction,
+        transfer: Box<RelayTransfer>,
+    },
+    Skipped {
+        raw: RawTransaction,
+        reason: &'static str,
+    },
 }
 
 #[derive(Debug, Clone)]
 pub enum RelayTransfer {
     Native(Box<NativeTransfer>),
     Token(Box<TokenTransfer>),
+}
+
+#[derive(Debug, Clone)]
+pub struct RawTransaction {
+    pub tx_hash: HashBytes,
+    pub account: StdAddr,
+    pub boc: Vec<u8>,
+    pub lt: u64,
+    pub now: u32,
 }
 
 #[derive(Debug, Clone)]

@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO raw_transactions (\n                transaction_hash,\n                transaction_lt,\n                transaction_time,\n                account_wc,\n                account,\n                status,\n                skip_reason\n            )\n            VALUES ($1, $2, $3, $4, $5, $6, $7)\n            ON CONFLICT (transaction_hash) DO UPDATE SET\n                transaction_lt = EXCLUDED.transaction_lt,\n                transaction_time = EXCLUDED.transaction_time,\n                account_wc = EXCLUDED.account_wc,\n                account = EXCLUDED.account,\n                status = EXCLUDED.status,\n                skip_reason = EXCLUDED.skip_reason,\n                updated_at = current_timestamp",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Numeric",
+        "Numeric",
+        "Int4",
+        "Varchar",
+        "Varchar",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "80dcb823f5b88212adc19753925befd64809461eca3d23b3d402b91ce935157c"
+}

@@ -27,17 +27,15 @@ impl SqlxClient {
                 transaction_time,
                 account_wc,
                 account,
-                transaction_boc,
                 status,
                 skip_reason
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             ON CONFLICT (transaction_hash) DO UPDATE SET
                 transaction_lt = EXCLUDED.transaction_lt,
                 transaction_time = EXCLUDED.transaction_time,
                 account_wc = EXCLUDED.account_wc,
                 account = EXCLUDED.account,
-                transaction_boc = EXCLUDED.transaction_boc,
                 status = EXCLUDED.status,
                 skip_reason = EXCLUDED.skip_reason,
                 updated_at = current_timestamp"#,
@@ -46,7 +44,6 @@ impl SqlxClient {
             BigDecimal::from(payload.now),
             payload.account.workchain as i32,
             payload.account.address.to_string(),
-            payload.boc.as_slice(),
             status,
             skip_reason,
         )

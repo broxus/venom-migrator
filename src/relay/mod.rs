@@ -9,7 +9,6 @@ use futures_util::StreamExt;
 use nekoton_core::contracts::blockchain_context::BlockchainContextBuilder;
 use nekoton_core::transport::Transport;
 use nekoton_transport::rpc::RpcTransport;
-use tycho_types::boc::Boc;
 use tycho_types::cell::{CellBuilder, CellSlice, HashBytes};
 use tycho_types::models::{MsgInfo, StdAddr, Transaction, TxInfo};
 use tycho_types::num::Tokens;
@@ -230,7 +229,6 @@ impl TxHandler {
         let raw = RawTransaction {
             tx_hash,
             account: account.clone(),
-            boc: Boc::encode(cell.as_ref()),
             lt: tx.lt,
             now: tx.now,
         };

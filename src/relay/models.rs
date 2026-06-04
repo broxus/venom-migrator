@@ -23,7 +23,6 @@ pub enum RelayTransfer {
 pub struct RawTransaction {
     pub tx_hash: HashBytes,
     pub account: StdAddr,
-    pub boc: Vec<u8>,
     pub lt: u64,
     pub now: u32,
 }

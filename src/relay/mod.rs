@@ -60,7 +60,16 @@ pub async fn run(
             raw_transaction = stream_transactions.next() => {
                 let raw_transaction = match raw_transaction {
                     Some(Ok(raw_transaction)) => raw_transaction,
-                    Some(Err(err)) => return Err(err),
+                    Some(Err(err)) => {
+                        tracing::warn!(
+                            ?err,
+                            retry_after = ?config.rpc_retry_interval,
+                            "failed to read transaction from RPC consumer; retrying..."
+                        );
+
+                        tokio::time::sleep(config.rpc_retry_interval).await;
+                        continue;
+                    }
                     None => {
                         tx_handler.flush().await?;
                         anyhow::bail!("transaction consumer stream finished");

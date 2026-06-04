@@ -5,7 +5,7 @@ use tycho_types::cell::HashBytes;
 use tycho_types::models::StdAddr;
 use tycho_util::serde_helpers;
 
-#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct RelayConfig {
     pub transaction_consumer: TransactionConsumerOptions,
@@ -15,6 +15,23 @@ pub struct RelayConfig {
 
     pub venom_rpc: String,
     pub tycho_rpc: String,
+
+    #[serde(with = "serde_helpers::humantime")]
+    pub rpc_retry_interval: Duration,
+}
+
+impl Default for RelayConfig {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            transaction_consumer: Default::default(),
+            wallet: Default::default(),
+            deposit: Default::default(),
+            venom_rpc: Default::default(),
+            tycho_rpc: Default::default(),
+            rpc_retry_interval: Duration::from_secs(5),
+        }
+    }
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]

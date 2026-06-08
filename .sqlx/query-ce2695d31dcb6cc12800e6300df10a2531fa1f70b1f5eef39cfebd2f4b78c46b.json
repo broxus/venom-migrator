@@ -1,0 +1,132 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n                transaction_hash as \"transaction_hash!\",\n                sender_wc as \"sender_wc!\",\n                sender_account as \"sender_account!\",\n                recipient_wc as \"recipient_wc!\",\n                recipient_account as \"recipient_account!\",\n                NULL::TEXT as token_symbol,\n                NULL::INT as token_address_wc,\n                NULL::TEXT as token_address_account,\n                value as \"amount!\",\n                status::TEXT as \"status!\",\n                created_at as \"created_at!\"\n            FROM transfers\n            WHERE ($1::INT IS NULL OR sender_wc = $1)\n                AND ($2::TEXT IS NULL OR sender_account = $2)\n            ORDER BY\n                CASE WHEN $4::BOOL THEN created_at END ASC,\n                CASE WHEN NOT $4::BOOL THEN created_at END DESC,\n                transaction_hash\n            LIMIT $3 OFFSET $5",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "transaction_hash!",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "transfers",
+            "name": "transaction_hash"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "sender_wc!",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "transfers",
+            "name": "sender_wc"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "sender_account!",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "transfers",
+            "name": "sender_account"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "recipient_wc!",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "transfers",
+            "name": "recipient_wc"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "recipient_account!",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "transfers",
+            "name": "recipient_account"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "token_symbol",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
+        "name": "token_address_wc",
+        "type_info": "Int4",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 7,
+        "name": "token_address_account",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 8,
+        "name": "amount!",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "transfers",
+            "name": "value"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "status!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 10,
+        "name": "created_at!",
+        "type_info": "Timestamp",
+        "origin": {
+          "Table": {
+            "table": "transfers",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Text",
+        "Int8",
+        "Bool",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      null,
+      null,
+      false,
+      null,
+      false
+    ]
+  },
+  "hash": "ce2695d31dcb6cc12800e6300df10a2531fa1f70b1f5eef39cfebd2f4b78c46b"
+}

@@ -12,6 +12,7 @@ use tycho_util::cli::logger::LoggerConfig;
 use tycho_util::cli::metrics::MetricsConfig;
 use tycho_util::config::PartialConfig;
 
+use venom_migrator::api::{self, ApiConfig};
 use venom_migrator::db::{DbConfig, SqlxClient};
 use venom_migrator::relay;
 use venom_migrator::relay::config::RelayConfig;
@@ -84,13 +85,12 @@ impl Cmd {
                 ),
             );
 
-            tracing::info!(
-                "waiting for light subscriber to catch up before running relay"
-            );
+            tracing::info!("waiting for light subscriber to catch up before running relay");
 
             tokio::select! {
                 res = block_strider.run() => res?,
-                res = run_relay_after_sync(sync_ready, &config.relay, sqlx_client, pending_messages) => res?,
+                res = run_api(sync_ready.clone(), &config.api, sqlx_client.clone()) => res?,
+                res = run_relay(sync_ready, &config.relay, sqlx_client, pending_messages) => res?,
             }
 
             // Done
@@ -99,7 +99,17 @@ impl Cmd {
     }
 }
 
-async fn run_relay_after_sync(
+async fn run_api(
+    sync_ready: Arc<Notify>,
+    config: &ApiConfig,
+    sqlx_client: SqlxClient,
+) -> Result<()> {
+    sync_ready.notified().await;
+    tracing::info!("light subscriber caught up, starting api");
+    api::serve(config, sqlx_client).await
+}
+
+async fn run_relay(
     sync_ready: Arc<Notify>,
     config: &RelayConfig,
     sqlx_client: SqlxClient,
@@ -122,6 +132,8 @@ struct NodeConfig {
     logger_config: LoggerConfig,
     #[important]
     metrics: Option<MetricsConfig>,
+    #[important]
+    api: ApiConfig,
     #[important]
     relay: RelayConfig,
     #[important]

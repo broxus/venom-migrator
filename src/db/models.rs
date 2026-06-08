@@ -2,9 +2,39 @@ use crate::relay::models::{NativeTransfer, TokenTransfer};
 use anyhow::Context;
 use bigdecimal::BigDecimal;
 use num_traits::ToPrimitive;
+use sqlx::types::chrono::NaiveDateTime;
 use std::str::FromStr;
 use tycho_types::cell::HashBytes;
 use tycho_types::models::StdAddr;
+
+#[derive(Debug, Clone)]
+pub struct TransfersSearch {
+    pub user_address: Option<StdAddr>,
+    pub ordering: TransfersSearchOrdering,
+    pub limit: i64,
+    pub offset: i64,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum TransfersSearchOrdering {
+    CreatedAtAscending,
+    CreatedAtDescending,
+}
+
+#[derive(Debug)]
+pub struct TransferFromDb {
+    pub transaction_hash: String,
+    pub sender_wc: i32,
+    pub sender_account: String,
+    pub recipient_wc: i32,
+    pub recipient_account: String,
+    pub token_symbol: Option<String>,
+    pub token_address_wc: Option<i32>,
+    pub token_address_account: Option<String>,
+    pub amount: BigDecimal,
+    pub status: String,
+    pub created_at: NaiveDateTime,
+}
 
 pub struct PendingRelayMessage {
     pub message_hash: HashBytes,

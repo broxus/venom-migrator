@@ -175,7 +175,7 @@ impl LightSubscriber {
             return;
         }
 
-        self.sync_ready.notify_one();
+        self.sync_ready.notify_waiters();
     }
 }
 

@@ -4,7 +4,10 @@ use sqlx::PgPool;
 mod models;
 mod transfers;
 
-pub use models::{PendingRelayMessage, TransferConfirmation};
+pub use models::{
+    PendingRelayMessage, TransferConfirmation, TransferFromDb, TransfersSearch,
+    TransfersSearchOrdering,
+};
 
 #[derive(Clone)]
 pub struct SqlxClient {

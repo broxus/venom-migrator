@@ -1,5 +1,6 @@
 use std::sync::OnceLock;
 
+pub mod api;
 pub mod db;
 pub mod relay;
 pub mod subscriber;

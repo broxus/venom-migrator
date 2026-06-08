@@ -5,15 +5,205 @@ use std::str::FromStr;
 use anyhow::Context;
 use bigdecimal::BigDecimal;
 use num_traits::ToPrimitive;
+use sqlx::postgres::PgArguments;
+use sqlx::{Arguments, Row};
 use tycho_types::cell::HashBytes;
 
 use crate::db::models::{
     NativeTransferFromDb, PendingRelayMessage, PendingTransferFromDb, TokenTransferFromDb,
+    TransferFromDb, TransfersSearch, TransfersSearchOrdering,
 };
 use crate::db::{SqlxClient, TransferConfirmation};
 use crate::relay::models::{NativeTransfer, RawTransaction, RelayTransfer, TokenTransfer};
 
 impl SqlxClient {
+    pub async fn search_native_transfers(
+        &self,
+        input: &TransfersSearch,
+    ) -> anyhow::Result<Vec<TransferFromDb>> {
+        let mut args = PgArguments::default();
+
+        let order_by = match input.ordering {
+            TransfersSearchOrdering::CreatedAtAscending => {
+                "ORDER BY created_at ASC, transaction_hash"
+            }
+            TransfersSearchOrdering::CreatedAtDescending => {
+                "ORDER BY created_at DESC, transaction_hash"
+            }
+        };
+
+        let filter = if let Some(address) = &input.user_address {
+            args.add(address.workchain as i32)
+                .map_err(sqlx::Error::Encode)?;
+            args.add(address.address.to_string())
+                .map_err(sqlx::Error::Encode)?;
+
+            "WHERE sender_wc = $1 AND sender_account = $2"
+        } else {
+            ""
+        };
+
+        let offset_arg = if input.user_address.is_some() { 3 } else { 1 };
+        args.add(input.offset).map_err(sqlx::Error::Encode)?;
+        let limit_arg = offset_arg + 1;
+        args.add(input.limit).map_err(sqlx::Error::Encode)?;
+
+        let query = format!(
+            r#"SELECT
+                transaction_hash,
+                sender_wc,
+                sender_account,
+                recipient_wc,
+                recipient_account,
+                value,
+                status::TEXT as status,
+                created_at
+            FROM transfers
+            {filter}
+            {order_by}
+            OFFSET ${offset_arg} LIMIT ${limit_arg}"#
+        );
+
+        let rows = sqlx::query_with(sqlx::AssertSqlSafe(query), args)
+            .fetch_all(&self.pool)
+            .await?;
+
+        let transfers = rows
+            .iter()
+            .map(|row| TransferFromDb {
+                transaction_hash: row.get("transaction_hash"),
+                sender_wc: row.get("sender_wc"),
+                sender_account: row.get("sender_account"),
+                recipient_wc: row.get("recipient_wc"),
+                recipient_account: row.get("recipient_account"),
+                token_symbol: None,
+                token_address_wc: None,
+                token_address_account: None,
+                amount: row.get("value"),
+                status: row.get("status"),
+                created_at: row.get("created_at"),
+            })
+            .collect();
+
+        Ok(transfers)
+    }
+
+    pub async fn search_token_transfers(
+        &self,
+        input: &TransfersSearch,
+    ) -> anyhow::Result<Vec<TransferFromDb>> {
+        let mut args = PgArguments::default();
+
+        let order_by = match input.ordering {
+            TransfersSearchOrdering::CreatedAtAscending => {
+                "ORDER BY created_at ASC, transaction_hash"
+            }
+            TransfersSearchOrdering::CreatedAtDescending => {
+                "ORDER BY created_at DESC, transaction_hash"
+            }
+        };
+
+        let filter = if let Some(address) = &input.user_address {
+            args.add(address.workchain as i32)
+                .map_err(sqlx::Error::Encode)?;
+            args.add(address.address.to_string())
+                .map_err(sqlx::Error::Encode)?;
+
+            "WHERE sender_wc = $1 AND sender_account = $2"
+        } else {
+            ""
+        };
+
+        let offset_arg = if input.user_address.is_some() { 3 } else { 1 };
+        args.add(input.offset).map_err(sqlx::Error::Encode)?;
+        let limit_arg = offset_arg + 1;
+        args.add(input.limit).map_err(sqlx::Error::Encode)?;
+
+        let query = format!(
+            r#"SELECT
+                transaction_hash,
+                sender_wc,
+                sender_account,
+                recipient_wc,
+                recipient_account,
+                ticker,
+                target_token_root_wc,
+                target_token_root_account,
+                value,
+                status::TEXT as status,
+                created_at
+            FROM token_transfers
+            {filter}
+            {order_by}
+            OFFSET ${offset_arg} LIMIT ${limit_arg}"#
+        );
+
+        let rows = sqlx::query_with(sqlx::AssertSqlSafe(query), args)
+            .fetch_all(&self.pool)
+            .await?;
+
+        let transfers = rows
+            .iter()
+            .map(|row| TransferFromDb {
+                transaction_hash: row.get("transaction_hash"),
+                sender_wc: row.get("sender_wc"),
+                sender_account: row.get("sender_account"),
+                recipient_wc: row.get("recipient_wc"),
+                recipient_account: row.get("recipient_account"),
+                token_symbol: Some(row.get("ticker")),
+                token_address_wc: Some(row.get("target_token_root_wc")),
+                token_address_account: Some(row.get("target_token_root_account")),
+                amount: row.get("value"),
+                status: row.get("status"),
+                created_at: row.get("created_at"),
+            })
+            .collect();
+
+        Ok(transfers)
+    }
+
+    pub async fn count_native_transfers(&self, input: &TransfersSearch) -> anyhow::Result<i64> {
+        let mut args = PgArguments::default();
+        let filter = if let Some(address) = &input.user_address {
+            args.add(address.workchain as i32)
+                .map_err(sqlx::Error::Encode)?;
+            args.add(address.address.to_string())
+                .map_err(sqlx::Error::Encode)?;
+            "WHERE sender_wc = $1 AND sender_account = $2"
+        } else {
+            ""
+        };
+
+        let query = format!("SELECT COUNT(*) as count FROM transfers {filter}");
+        let count = sqlx::query_with(sqlx::AssertSqlSafe(query), args)
+            .fetch_one(&self.pool)
+            .await?
+            .get("count");
+
+        Ok(count)
+    }
+
+    pub async fn count_token_transfers(&self, input: &TransfersSearch) -> anyhow::Result<i64> {
+        let mut args = PgArguments::default();
+        let filter = if let Some(address) = &input.user_address {
+            args.add(address.workchain as i32)
+                .map_err(sqlx::Error::Encode)?;
+            args.add(address.address.to_string())
+                .map_err(sqlx::Error::Encode)?;
+            "WHERE sender_wc = $1 AND sender_account = $2"
+        } else {
+            ""
+        };
+
+        let query = format!("SELECT COUNT(*) as count FROM token_transfers {filter}");
+        let count = sqlx::query_with(sqlx::AssertSqlSafe(query), args)
+            .fetch_one(&self.pool)
+            .await?
+            .get("count");
+
+        Ok(count)
+    }
+
     pub async fn upsert_raw_transaction(
         &self,
         payload: &RawTransaction,

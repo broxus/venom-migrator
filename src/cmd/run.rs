@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
 use tokio::sync::Notify;
+use tokio::sync::futures::OwnedNotified;
 use tycho_core::block_strider::{BlockProviderExt, MetricsSubscriber};
 use tycho_core::node::{LightNodeConfig, LightNodeContext, NodeBaseConfig, NodeBootArgs};
 use tycho_util::cli;
@@ -85,12 +86,15 @@ impl Cmd {
                 ),
             );
 
-            tracing::info!("waiting for light subscriber to catch up before running relay");
+            tracing::info!("waiting for light subscriber to catch up before running services");
+
+            let api_ready = sync_ready.clone().notified_owned();
+            let relay_ready = sync_ready.clone().notified_owned();
 
             tokio::select! {
                 res = block_strider.run() => res?,
-                res = run_api(sync_ready.clone(), &config.api, sqlx_client.clone()) => res?,
-                res = run_relay(sync_ready, &config.relay, sqlx_client, pending_messages) => res?,
+                res = run_api(api_ready, &config.api, sqlx_client.clone()) => res?,
+                res = run_relay(relay_ready, &config.relay, sqlx_client, pending_messages) => res?,
             }
 
             // Done
@@ -100,22 +104,22 @@ impl Cmd {
 }
 
 async fn run_api(
-    sync_ready: Arc<Notify>,
+    sync_ready: OwnedNotified,
     config: &ApiConfig,
     sqlx_client: SqlxClient,
 ) -> Result<()> {
-    sync_ready.notified().await;
+    sync_ready.await;
     tracing::info!("light subscriber caught up, starting api");
     api::serve(config, sqlx_client).await
 }
 
 async fn run_relay(
-    sync_ready: Arc<Notify>,
+    sync_ready: OwnedNotified,
     config: &RelayConfig,
     sqlx_client: SqlxClient,
     pending_messages: PendingMessages,
 ) -> Result<()> {
-    sync_ready.notified().await;
+    sync_ready.await;
     tracing::info!("light subscriber caught up, starting relay");
     relay::run(config, sqlx_client, pending_messages).await
 }

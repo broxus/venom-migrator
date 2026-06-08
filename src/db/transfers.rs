@@ -28,22 +28,13 @@ impl SqlxClient {
                 "ORDER BY created_at ASC, transaction_hash"
             }
             TransfersSearchOrdering::CreatedAtDescending => {
-                "ORDER BY created_at DESC, transaction_hash"
+                "ORDER BY created_at DESC, transaction_hash DESC"
             }
         };
 
-        let filter = if let Some(address) = &input.user_address {
-            args.add(address.workchain as i32)
-                .map_err(sqlx::Error::Encode)?;
-            args.add(address.address.to_string())
-                .map_err(sqlx::Error::Encode)?;
+        let (filter, args_len) = filter_transfers_query(&mut args, input)?;
 
-            "WHERE sender_wc = $1 AND sender_account = $2"
-        } else {
-            ""
-        };
-
-        let offset_arg = if input.user_address.is_some() { 3 } else { 1 };
+        let offset_arg = args_len + 1;
         args.add(input.offset).map_err(sqlx::Error::Encode)?;
         let limit_arg = offset_arg + 1;
         args.add(input.limit).map_err(sqlx::Error::Encode)?;
@@ -99,22 +90,13 @@ impl SqlxClient {
                 "ORDER BY created_at ASC, transaction_hash"
             }
             TransfersSearchOrdering::CreatedAtDescending => {
-                "ORDER BY created_at DESC, transaction_hash"
+                "ORDER BY created_at DESC, transaction_hash DESC"
             }
         };
 
-        let filter = if let Some(address) = &input.user_address {
-            args.add(address.workchain as i32)
-                .map_err(sqlx::Error::Encode)?;
-            args.add(address.address.to_string())
-                .map_err(sqlx::Error::Encode)?;
+        let (filter, args_len) = filter_transfers_query(&mut args, input)?;
 
-            "WHERE sender_wc = $1 AND sender_account = $2"
-        } else {
-            ""
-        };
-
-        let offset_arg = if input.user_address.is_some() { 3 } else { 1 };
+        let offset_arg = args_len + 1;
         args.add(input.offset).map_err(sqlx::Error::Encode)?;
         let limit_arg = offset_arg + 1;
         args.add(input.limit).map_err(sqlx::Error::Encode)?;
@@ -164,15 +146,7 @@ impl SqlxClient {
 
     pub async fn count_native_transfers(&self, input: &TransfersSearch) -> anyhow::Result<i64> {
         let mut args = PgArguments::default();
-        let filter = if let Some(address) = &input.user_address {
-            args.add(address.workchain as i32)
-                .map_err(sqlx::Error::Encode)?;
-            args.add(address.address.to_string())
-                .map_err(sqlx::Error::Encode)?;
-            "WHERE sender_wc = $1 AND sender_account = $2"
-        } else {
-            ""
-        };
+        let (filter, _) = filter_transfers_query(&mut args, input)?;
 
         let query = format!("SELECT COUNT(*) as count FROM transfers {filter}");
         let count = sqlx::query_with(sqlx::AssertSqlSafe(query), args)
@@ -185,15 +159,7 @@ impl SqlxClient {
 
     pub async fn count_token_transfers(&self, input: &TransfersSearch) -> anyhow::Result<i64> {
         let mut args = PgArguments::default();
-        let filter = if let Some(address) = &input.user_address {
-            args.add(address.workchain as i32)
-                .map_err(sqlx::Error::Encode)?;
-            args.add(address.address.to_string())
-                .map_err(sqlx::Error::Encode)?;
-            "WHERE sender_wc = $1 AND sender_account = $2"
-        } else {
-            ""
-        };
+        let (filter, _) = filter_transfers_query(&mut args, input)?;
 
         let query = format!("SELECT COUNT(*) as count FROM token_transfers {filter}");
         let count = sqlx::query_with(sqlx::AssertSqlSafe(query), args)
@@ -699,6 +665,40 @@ impl SqlxClient {
 
         Ok(())
     }
+}
+
+fn filter_transfers_query(
+    args: &mut PgArguments,
+    input: &TransfersSearch,
+) -> anyhow::Result<(String, i32)> {
+    let mut filters = Vec::new();
+    let mut args_len = 0;
+
+    if let Some(address) = &input.user_address {
+        args_len += 1;
+        filters.push(format!("sender_wc = ${args_len}"));
+        args.add(address.workchain as i32)
+            .map_err(sqlx::Error::Encode)?;
+
+        args_len += 1;
+        filters.push(format!("sender_account = ${args_len}"));
+        args.add(address.address.to_string())
+            .map_err(sqlx::Error::Encode)?;
+    }
+
+    if let Some(status) = input.status {
+        args_len += 1;
+        filters.push(format!("status = ${args_len}"));
+        args.add(status).map_err(sqlx::Error::Encode)?;
+    }
+
+    let filter = if filters.is_empty() {
+        String::new()
+    } else {
+        format!("WHERE {}", filters.join(" AND "))
+    };
+
+    Ok((filter, args_len))
 }
 
 fn push_pending_transfer(

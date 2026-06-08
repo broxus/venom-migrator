@@ -1,18 +1,31 @@
-use crate::relay::models::{NativeTransfer, TokenTransfer};
 use anyhow::Context;
 use bigdecimal::BigDecimal;
 use num_traits::ToPrimitive;
+use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::NaiveDateTime;
 use std::str::FromStr;
 use tycho_types::cell::HashBytes;
 use tycho_types::models::StdAddr;
 
+use crate::relay::models::{NativeTransfer, TokenTransfer};
+
 #[derive(Debug, Clone)]
 pub struct TransfersSearch {
     pub user_address: Option<StdAddr>,
+    pub status: Option<TransferStatus>,
     pub ordering: TransfersSearchOrdering,
     pub limit: i64,
     pub offset: i64,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Eq, PartialEq, sqlx::Type)]
+#[sqlx(type_name = "transaction_status", rename_all = "PascalCase")]
+pub enum TransferStatus {
+    New,
+    Pending,
+    Expired,
+    Done,
+    Failed,
 }
 
 #[derive(Debug, Clone, Copy)]

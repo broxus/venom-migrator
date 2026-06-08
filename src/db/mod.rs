@@ -5,7 +5,7 @@ mod models;
 mod transfers;
 
 pub use models::{
-    PendingRelayMessage, TransferConfirmation, TransferFromDb, TransfersSearch,
+    PendingRelayMessage, TransferConfirmation, TransferFromDb, TransferStatus, TransfersSearch,
     TransfersSearchOrdering,
 };
 

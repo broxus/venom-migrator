@@ -6,7 +6,7 @@ use tycho_types::cell::HashBytes;
 use tycho_types::models::StdAddr;
 
 use crate::api::InvalidRequest;
-use crate::db::{TransferFromDb, TransfersSearch, TransfersSearchOrdering};
+use crate::db::{TransferFromDb, TransferStatus, TransfersSearch, TransfersSearchOrdering};
 
 const MAX_LIMIT: i64 = 100;
 
@@ -17,6 +17,7 @@ pub struct TransferSearchRequest {
     pub offset: i64,
     pub ordering: TransferSearchOrdering,
     pub user_address: Option<String>,
+    pub status: Option<TransferStatus>,
     pub need_total_count: bool,
 }
 
@@ -85,6 +86,7 @@ impl TryFrom<TransferSearchRequest> for TransfersSearch {
 
         Ok(Self {
             user_address,
+            status: value.status,
             ordering: value.ordering.into(),
             limit,
             offset,

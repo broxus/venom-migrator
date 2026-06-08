@@ -1004,7 +1004,7 @@ dependencies = [
 [[package]]
 name = "everscale-jrpc-transaction-consumer"
 version = "0.1.0"
-source = "git+https://github.com/broxus/jrpc-transaction-consumer#f3ffd6a5d55ad19f7ad900694695cd9e92c552d3"
+source = "git+https://github.com/broxus/jrpc-transaction-consumer#65d107f5cb089049829f0e82187cafa424b1133d"
 dependencies = [
  "anyhow",
  "async-trait",

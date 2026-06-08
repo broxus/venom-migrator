@@ -1,10 +1,14 @@
 use std::sync::Arc;
 
+use std::str::FromStr;
+
 use axum::Extension;
 use axum::Json;
+use axum::extract::Path;
+use tycho_types::cell::HashBytes;
 
 use crate::api::models::{TransferResponse, TransferSearchRequest, TransferSearchResponse};
-use crate::api::{ApiContext, Result};
+use crate::api::{ApiContext, InvalidRequest, NotFound, Result};
 
 pub async fn post_transfers_search(
     Extension(ctx): Extension<Arc<ApiContext>>,
@@ -50,6 +54,38 @@ pub async fn post_token_transfers_search(
     };
 
     Ok(Json(response))
+}
+
+pub async fn get_transfer(
+    Extension(ctx): Extension<Arc<ApiContext>>,
+    Path(tx_hash): Path<String>,
+) -> Result<Json<TransferResponse>> {
+    let tx_hash = HashBytes::from_str(&tx_hash)
+        .map_err(|_| InvalidRequest("invalid txHash"))?
+        .to_string();
+    let transfer = ctx
+        .sqlx_client
+        .get_native_transfer(&tx_hash)
+        .await?
+        .ok_or(NotFound("transfer not found"))?;
+
+    Ok(Json(TransferResponse::try_from(transfer)?))
+}
+
+pub async fn get_token_transfer(
+    Extension(ctx): Extension<Arc<ApiContext>>,
+    Path(tx_hash): Path<String>,
+) -> Result<Json<TransferResponse>> {
+    let tx_hash = HashBytes::from_str(&tx_hash)
+        .map_err(|_| InvalidRequest("invalid txHash"))?
+        .to_string();
+    let transfer = ctx
+        .sqlx_client
+        .get_token_transfer(&tx_hash)
+        .await?
+        .ok_or(NotFound("token transfer not found"))?;
+
+    Ok(Json(TransferResponse::try_from(transfer)?))
 }
 
 fn transfers_to_response(

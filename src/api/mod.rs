@@ -72,6 +72,8 @@ impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let status = if self.0.downcast_ref::<InvalidRequest>().is_some() {
             StatusCode::BAD_REQUEST
+        } else if self.0.downcast_ref::<NotFound>().is_some() {
+            StatusCode::NOT_FOUND
         } else {
             StatusCode::INTERNAL_SERVER_ERROR
         };
@@ -89,3 +91,7 @@ impl IntoResponse for Error {
 #[derive(Debug, thiserror::Error)]
 #[error("{0}")]
 pub struct InvalidRequest(pub &'static str);
+
+#[derive(Debug, thiserror::Error)]
+#[error("{0}")]
+pub struct NotFound(pub &'static str);

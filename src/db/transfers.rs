@@ -170,6 +170,87 @@ impl SqlxClient {
         Ok(count)
     }
 
+    pub async fn get_native_transfer(
+        &self,
+        tx_hash: &str,
+    ) -> anyhow::Result<Option<TransferFromDb>> {
+        let mut args = PgArguments::default();
+        args.add(tx_hash).map_err(sqlx::Error::Encode)?;
+
+        let row = sqlx::query_with(
+            r#"SELECT
+                transaction_hash,
+                sender_wc,
+                sender_account,
+                recipient_wc,
+                recipient_account,
+                value,
+                status::TEXT as status,
+                created_at
+            FROM transfers
+            WHERE transaction_hash = $1"#,
+            args,
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(|row| TransferFromDb {
+            transaction_hash: row.get("transaction_hash"),
+            sender_wc: row.get("sender_wc"),
+            sender_account: row.get("sender_account"),
+            recipient_wc: row.get("recipient_wc"),
+            recipient_account: row.get("recipient_account"),
+            token_symbol: None,
+            token_address_wc: None,
+            token_address_account: None,
+            amount: row.get("value"),
+            status: row.get("status"),
+            created_at: row.get("created_at"),
+        }))
+    }
+
+    pub async fn get_token_transfer(
+        &self,
+        tx_hash: &str,
+    ) -> anyhow::Result<Option<TransferFromDb>> {
+        let mut args = PgArguments::default();
+        args.add(tx_hash).map_err(sqlx::Error::Encode)?;
+
+        let row = sqlx::query_with(
+            r#"SELECT
+                transaction_hash,
+                sender_wc,
+                sender_account,
+                recipient_wc,
+                recipient_account,
+                ticker,
+                target_token_root_wc,
+                target_token_root_account,
+                value,
+                status::TEXT as status,
+                created_at
+            FROM token_transfers
+            WHERE transaction_hash = $1"#,
+            args,
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(|row| TransferFromDb {
+            transaction_hash: row.get("transaction_hash"),
+            sender_wc: row.get("sender_wc"),
+            sender_account: row.get("sender_account"),
+            recipient_wc: row.get("recipient_wc"),
+            recipient_account: row.get("recipient_account"),
+            token_symbol: Some(row.get("ticker")),
+            token_address_wc: Some(row.get("target_token_root_wc")),
+            token_address_account: Some(row.get("target_token_root_account")),
+            amount: row.get("value"),
+            status: row.get("status"),
+            created_at: row.get("created_at"),
+        }))
+    }
+
     pub async fn upsert_raw_transaction(
         &self,
         payload: &RawTransaction,

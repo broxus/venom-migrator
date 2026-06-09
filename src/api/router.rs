@@ -12,13 +12,5 @@ pub fn router(ctx: Arc<ApiContext>) -> Router {
             post(controllers::post_transfers_search),
         )
         .route("/v1/transfers/{tx_hash}", get(controllers::get_transfer))
-        .route(
-            "/v1/token-transfers/search",
-            post(controllers::post_token_transfers_search),
-        )
-        .route(
-            "/v1/token-transfers/{tx_hash}",
-            get(controllers::get_token_transfer),
-        )
         .layer(Extension(ctx))
 }

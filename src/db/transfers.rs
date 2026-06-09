@@ -17,69 +17,7 @@ use crate::db::{SqlxClient, TransferConfirmation};
 use crate::relay::models::{NativeTransfer, RawTransaction, RelayTransfer, TokenTransfer};
 
 impl SqlxClient {
-    pub async fn search_native_transfers(
-        &self,
-        input: &TransfersSearch,
-    ) -> anyhow::Result<Vec<TransferFromDb>> {
-        let mut args = PgArguments::default();
-
-        let order_by = match input.ordering {
-            TransfersSearchOrdering::CreatedAtAscending => {
-                "ORDER BY created_at ASC, transaction_hash"
-            }
-            TransfersSearchOrdering::CreatedAtDescending => {
-                "ORDER BY created_at DESC, transaction_hash DESC"
-            }
-        };
-
-        let (filter, args_len) = filter_transfers_query(&mut args, input)?;
-
-        let offset_arg = args_len + 1;
-        args.add(input.offset).map_err(sqlx::Error::Encode)?;
-        let limit_arg = offset_arg + 1;
-        args.add(input.limit).map_err(sqlx::Error::Encode)?;
-
-        let query = format!(
-            r#"SELECT
-                transaction_hash,
-                sender_wc,
-                sender_account,
-                recipient_wc,
-                recipient_account,
-                value,
-                status::TEXT as status,
-                created_at
-            FROM transfers
-            {filter}
-            {order_by}
-            OFFSET ${offset_arg} LIMIT ${limit_arg}"#
-        );
-
-        let rows = sqlx::query_with(sqlx::AssertSqlSafe(query), args)
-            .fetch_all(&self.pool)
-            .await?;
-
-        let transfers = rows
-            .iter()
-            .map(|row| TransferFromDb {
-                transaction_hash: row.get("transaction_hash"),
-                sender_wc: row.get("sender_wc"),
-                sender_account: row.get("sender_account"),
-                recipient_wc: row.get("recipient_wc"),
-                recipient_account: row.get("recipient_account"),
-                token_symbol: None,
-                token_address_wc: None,
-                token_address_account: None,
-                amount: row.get("value"),
-                status: row.get("status"),
-                created_at: row.get("created_at"),
-            })
-            .collect();
-
-        Ok(transfers)
-    }
-
-    pub async fn search_token_transfers(
+    pub async fn search_transfers(
         &self,
         input: &TransfersSearch,
     ) -> anyhow::Result<Vec<TransferFromDb>> {
@@ -114,7 +52,35 @@ impl SqlxClient {
                 value,
                 status::TEXT as status,
                 created_at
-            FROM token_transfers
+            FROM (
+                SELECT
+                    transaction_hash,
+                    sender_wc,
+                    sender_account,
+                    recipient_wc,
+                    recipient_account,
+                    NULL::TEXT as ticker,
+                    NULL::INT as target_token_root_wc,
+                    NULL::TEXT as target_token_root_account,
+                    value,
+                    status,
+                    created_at
+                FROM transfers
+                UNION ALL
+                SELECT
+                    transaction_hash,
+                    sender_wc,
+                    sender_account,
+                    recipient_wc,
+                    recipient_account,
+                    ticker,
+                    target_token_root_wc,
+                    target_token_root_account,
+                    value,
+                    status,
+                    created_at
+                FROM token_transfers
+            ) transfers
             {filter}
             {order_by}
             OFFSET ${offset_arg} LIMIT ${limit_arg}"#
@@ -132,9 +98,9 @@ impl SqlxClient {
                 sender_account: row.get("sender_account"),
                 recipient_wc: row.get("recipient_wc"),
                 recipient_account: row.get("recipient_account"),
-                token_symbol: Some(row.get("ticker")),
-                token_address_wc: Some(row.get("target_token_root_wc")),
-                token_address_account: Some(row.get("target_token_root_account")),
+                token_symbol: row.get("ticker"),
+                token_address_wc: row.get("target_token_root_wc"),
+                token_address_account: row.get("target_token_root_account"),
                 amount: row.get("value"),
                 status: row.get("status"),
                 created_at: row.get("created_at"),
@@ -144,11 +110,27 @@ impl SqlxClient {
         Ok(transfers)
     }
 
-    pub async fn count_native_transfers(&self, input: &TransfersSearch) -> anyhow::Result<i64> {
+    pub async fn count_transfers(&self, input: &TransfersSearch) -> anyhow::Result<i64> {
         let mut args = PgArguments::default();
         let (filter, _) = filter_transfers_query(&mut args, input)?;
 
-        let query = format!("SELECT COUNT(*) as count FROM transfers {filter}");
+        let query = format!(
+            r#"SELECT COUNT(*) as count
+            FROM (
+                SELECT
+                    sender_wc,
+                    sender_account,
+                    status
+                FROM transfers
+                UNION ALL
+                SELECT
+                    sender_wc,
+                    sender_account,
+                    status
+                FROM token_transfers
+            ) transfers
+            {filter}"#
+        );
         let count = sqlx::query_with(sqlx::AssertSqlSafe(query), args)
             .fetch_one(&self.pool)
             .await?
@@ -157,62 +139,7 @@ impl SqlxClient {
         Ok(count)
     }
 
-    pub async fn count_token_transfers(&self, input: &TransfersSearch) -> anyhow::Result<i64> {
-        let mut args = PgArguments::default();
-        let (filter, _) = filter_transfers_query(&mut args, input)?;
-
-        let query = format!("SELECT COUNT(*) as count FROM token_transfers {filter}");
-        let count = sqlx::query_with(sqlx::AssertSqlSafe(query), args)
-            .fetch_one(&self.pool)
-            .await?
-            .get("count");
-
-        Ok(count)
-    }
-
-    pub async fn get_native_transfer(
-        &self,
-        tx_hash: &str,
-    ) -> anyhow::Result<Option<TransferFromDb>> {
-        let mut args = PgArguments::default();
-        args.add(tx_hash).map_err(sqlx::Error::Encode)?;
-
-        let row = sqlx::query_with(
-            r#"SELECT
-                transaction_hash,
-                sender_wc,
-                sender_account,
-                recipient_wc,
-                recipient_account,
-                value,
-                status::TEXT as status,
-                created_at
-            FROM transfers
-            WHERE transaction_hash = $1"#,
-            args,
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-
-        Ok(row.map(|row| TransferFromDb {
-            transaction_hash: row.get("transaction_hash"),
-            sender_wc: row.get("sender_wc"),
-            sender_account: row.get("sender_account"),
-            recipient_wc: row.get("recipient_wc"),
-            recipient_account: row.get("recipient_account"),
-            token_symbol: None,
-            token_address_wc: None,
-            token_address_account: None,
-            amount: row.get("value"),
-            status: row.get("status"),
-            created_at: row.get("created_at"),
-        }))
-    }
-
-    pub async fn get_token_transfer(
-        &self,
-        tx_hash: &str,
-    ) -> anyhow::Result<Option<TransferFromDb>> {
+    pub async fn get_transfer(&self, tx_hash: &str) -> anyhow::Result<Option<TransferFromDb>> {
         let mut args = PgArguments::default();
         args.add(tx_hash).map_err(sqlx::Error::Encode)?;
 
@@ -229,8 +156,37 @@ impl SqlxClient {
                 value,
                 status::TEXT as status,
                 created_at
-            FROM token_transfers
-            WHERE transaction_hash = $1"#,
+            FROM (
+                SELECT
+                    transaction_hash,
+                    sender_wc,
+                    sender_account,
+                    recipient_wc,
+                    recipient_account,
+                    NULL::TEXT as ticker,
+                    NULL::INT as target_token_root_wc,
+                    NULL::TEXT as target_token_root_account,
+                    value,
+                    status,
+                    created_at
+                FROM transfers
+                UNION ALL
+                SELECT
+                    transaction_hash,
+                    sender_wc,
+                    sender_account,
+                    recipient_wc,
+                    recipient_account,
+                    ticker,
+                    target_token_root_wc,
+                    target_token_root_account,
+                    value,
+                    status,
+                    created_at
+                FROM token_transfers
+            ) transfers
+            WHERE transaction_hash = $1
+            LIMIT 1"#,
             args,
         )
         .fetch_optional(&self.pool)
@@ -242,9 +198,9 @@ impl SqlxClient {
             sender_account: row.get("sender_account"),
             recipient_wc: row.get("recipient_wc"),
             recipient_account: row.get("recipient_account"),
-            token_symbol: Some(row.get("ticker")),
-            token_address_wc: Some(row.get("target_token_root_wc")),
-            token_address_account: Some(row.get("target_token_root_account")),
+            token_symbol: row.get("ticker"),
+            token_address_wc: row.get("target_token_root_wc"),
+            token_address_account: row.get("target_token_root_account"),
             amount: row.get("value"),
             status: row.get("status"),
             created_at: row.get("created_at"),

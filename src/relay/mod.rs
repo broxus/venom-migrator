@@ -183,7 +183,7 @@ impl TxHandler {
             let target_token_wallet = target_contract.wallet_of(wallet.address().clone())?;
 
             let source_ticker = source_contract.symbol()?;
-            let target_ticker = target_contract.symbol()?;
+            let _target_ticker = target_contract.symbol()?;
 
             // anyhow::ensure!(
             //     source_ticker == target_ticker,

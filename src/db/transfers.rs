@@ -21,6 +21,115 @@ impl SqlxClient {
         &self,
         input: &TransfersSearch,
     ) -> anyhow::Result<Vec<TransferFromDb>> {
+        self.search_transfers_impl(input).await
+    }
+
+    pub async fn count_transfers(&self, input: &TransfersSearch) -> anyhow::Result<i64> {
+        self.count_transfers_impl(input).await
+    }
+
+    pub async fn get_transfer(&self, tx_hash: &str) -> anyhow::Result<Option<TransferFromDb>> {
+        self.get_transfer_impl(tx_hash).await
+    }
+
+    pub async fn upsert_raw_transaction(
+        &self,
+        payload: &RawTransaction,
+        status: &str,
+        skip_reason: Option<&str>,
+    ) -> anyhow::Result<()> {
+        self.retry("upsert_raw_transaction", || async {
+            self.upsert_raw_transaction_impl(payload, status, skip_reason)
+                .await
+        })
+        .await
+    }
+
+    pub async fn load_pending_relay_messages(&self) -> anyhow::Result<Vec<PendingRelayMessage>> {
+        self.retry("load_pending_relay_messages", || async {
+            self.load_pending_relay_messages_impl().await
+        })
+        .await
+    }
+
+    pub async fn load_new_relay_transfers(&self) -> anyhow::Result<Vec<RelayTransfer>> {
+        self.retry("load_new_relay_transfers", || async {
+            self.load_new_relay_transfers_impl().await
+        })
+        .await
+    }
+
+    pub async fn create_transfer(&self, payload: &NativeTransfer) -> anyhow::Result<bool> {
+        self.retry("create_transfer", || async {
+            self.create_transfer_impl(payload).await
+        })
+        .await
+    }
+
+    pub async fn create_token_transfer(&self, payload: &TokenTransfer) -> anyhow::Result<bool> {
+        self.retry("create_token_transfer", || async {
+            self.create_token_transfer_impl(payload).await
+        })
+        .await
+    }
+
+    pub async fn mark_relay_transfers_pending(
+        &self,
+        native_tx_hashes: &[HashBytes],
+        token_tx_hashes: &[HashBytes],
+        message_hash: &HashBytes,
+        expired_at: u32,
+    ) -> anyhow::Result<()> {
+        self.retry("mark_relay_transfers_pending", || async {
+            self.mark_relay_transfers_pending_impl(
+                native_tx_hashes,
+                token_tx_hashes,
+                message_hash,
+                expired_at,
+            )
+            .await
+        })
+        .await
+    }
+
+    pub async fn mark_relay_transfers_expired(
+        &self,
+        native_tx_hashes: &[HashBytes],
+        token_tx_hashes: &[HashBytes],
+        message_hash: &HashBytes,
+    ) -> anyhow::Result<()> {
+        self.retry("mark_relay_transfers_expired", || async {
+            self.mark_relay_transfers_expired_impl(native_tx_hashes, token_tx_hashes, message_hash)
+                .await
+        })
+        .await
+    }
+
+    pub async fn mark_relay_transfers_failed(
+        &self,
+        message_hashes: &[HashBytes],
+    ) -> anyhow::Result<()> {
+        self.retry("mark_relay_transfers_failed", || async {
+            self.mark_relay_transfers_failed_impl(message_hashes).await
+        })
+        .await
+    }
+
+    pub async fn mark_relay_transfers_done(
+        &self,
+        native: &[TransferConfirmation],
+        token: &[TransferConfirmation],
+    ) -> anyhow::Result<()> {
+        self.retry("mark_relay_transfers_done", || async {
+            self.mark_relay_transfers_done_impl(native, token).await
+        })
+        .await
+    }
+
+    async fn search_transfers_impl(
+        &self,
+        input: &TransfersSearch,
+    ) -> anyhow::Result<Vec<TransferFromDb>> {
         let mut args = PgArguments::default();
 
         let order_by = match input.ordering {
@@ -110,7 +219,7 @@ impl SqlxClient {
         Ok(transfers)
     }
 
-    pub async fn count_transfers(&self, input: &TransfersSearch) -> anyhow::Result<i64> {
+    async fn count_transfers_impl(&self, input: &TransfersSearch) -> anyhow::Result<i64> {
         let mut args = PgArguments::default();
         let (filter, _) = filter_transfers_query(&mut args, input)?;
 
@@ -139,7 +248,7 @@ impl SqlxClient {
         Ok(count)
     }
 
-    pub async fn get_transfer(&self, tx_hash: &str) -> anyhow::Result<Option<TransferFromDb>> {
+    async fn get_transfer_impl(&self, tx_hash: &str) -> anyhow::Result<Option<TransferFromDb>> {
         let mut args = PgArguments::default();
         args.add(tx_hash).map_err(sqlx::Error::Encode)?;
 
@@ -207,7 +316,7 @@ impl SqlxClient {
         }))
     }
 
-    pub async fn upsert_raw_transaction(
+    async fn upsert_raw_transaction_impl(
         &self,
         payload: &RawTransaction,
         status: &str,
@@ -246,7 +355,7 @@ impl SqlxClient {
         Ok(())
     }
 
-    pub async fn load_pending_relay_messages(&self) -> anyhow::Result<Vec<PendingRelayMessage>> {
+    async fn load_pending_relay_messages_impl(&self) -> anyhow::Result<Vec<PendingRelayMessage>> {
         let native = sqlx::query_as!(
             PendingTransferFromDb,
             r#"SELECT
@@ -290,7 +399,7 @@ impl SqlxClient {
         Ok(messages)
     }
 
-    pub async fn load_new_relay_transfers(&self) -> anyhow::Result<Vec<RelayTransfer>> {
+    async fn load_new_relay_transfers_impl(&self) -> anyhow::Result<Vec<RelayTransfer>> {
         let native = sqlx::query_as!(
             NativeTransferFromDb,
             r#"SELECT
@@ -348,7 +457,7 @@ impl SqlxClient {
         Ok(transfers)
     }
 
-    pub async fn create_transfer(&self, payload: &NativeTransfer) -> anyhow::Result<bool> {
+    async fn create_transfer_impl(&self, payload: &NativeTransfer) -> anyhow::Result<bool> {
         let res = sqlx::query!(
             r#"INSERT INTO transfers (
                 transaction_hash,
@@ -379,7 +488,7 @@ impl SqlxClient {
         Ok(res.is_some())
     }
 
-    pub async fn create_token_transfer(&self, payload: &TokenTransfer) -> anyhow::Result<bool> {
+    async fn create_token_transfer_impl(&self, payload: &TokenTransfer) -> anyhow::Result<bool> {
         let res = sqlx::query!(
             r#"INSERT INTO token_transfers (
                 transaction_hash,
@@ -428,7 +537,7 @@ impl SqlxClient {
         Ok(res.is_some())
     }
 
-    pub async fn mark_relay_transfers_pending(
+    async fn mark_relay_transfers_pending_impl(
         &self,
         native_tx_hashes: &[HashBytes],
         token_tx_hashes: &[HashBytes],
@@ -489,7 +598,7 @@ impl SqlxClient {
         Ok(())
     }
 
-    pub async fn mark_relay_transfers_expired(
+    async fn mark_relay_transfers_expired_impl(
         &self,
         native_tx_hashes: &[HashBytes],
         token_tx_hashes: &[HashBytes],
@@ -548,7 +657,7 @@ impl SqlxClient {
         Ok(())
     }
 
-    pub async fn mark_relay_transfers_failed(
+    async fn mark_relay_transfers_failed_impl(
         &self,
         message_hashes: &[HashBytes],
     ) -> anyhow::Result<()> {
@@ -583,7 +692,7 @@ impl SqlxClient {
         Ok(())
     }
 
-    pub async fn mark_relay_transfers_done(
+    async fn mark_relay_transfers_done_impl(
         &self,
         native: &[TransferConfirmation],
         token: &[TransferConfirmation],

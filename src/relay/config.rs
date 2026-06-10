@@ -16,6 +16,9 @@ pub struct RelayConfig {
     pub venom_rpc: String,
     pub tycho_rpc: String,
 
+    #[serde(with = "serde_helpers::string")]
+    pub min_transaction_lt: u64,
+
     #[serde(with = "serde_helpers::humantime")]
     pub rpc_retry_interval: Duration,
 }
@@ -29,6 +32,7 @@ impl Default for RelayConfig {
             deposit: Default::default(),
             venom_rpc: Default::default(),
             tycho_rpc: Default::default(),
+            min_transaction_lt: 0,
             rpc_retry_interval: Duration::from_secs(5),
         }
     }

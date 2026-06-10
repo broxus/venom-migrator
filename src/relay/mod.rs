@@ -76,6 +76,18 @@ pub async fn run(
                     }
                 };
 
+                if raw_transaction.transaction.lt <= config.min_transaction_lt {
+                    tracing::info!(
+                        transaction_lt = raw_transaction.transaction.lt,
+                        min_transaction_lt = config.min_transaction_lt,
+                        "skipping transaction below configured lt threshold"
+                    );
+
+                    raw_transaction.commit().await?;
+
+                    continue;
+                }
+
                 match tx_handler.parse(&raw_transaction).await {
                     Ok(TxHandleStatus::Skipped { raw, reason }) => {
                         tx_handler

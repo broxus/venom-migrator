@@ -21,12 +21,21 @@ pub struct SqlxClient {
 }
 
 impl SqlxClient {
-    pub fn new(pool: PgPool, retry_interval: Duration, retry_timeout: Duration) -> SqlxClient {
-        SqlxClient {
+    pub fn new(
+        pool: PgPool,
+        retry_interval: Duration,
+        retry_timeout: Duration,
+    ) -> anyhow::Result<Self> {
+        anyhow::ensure!(
+            retry_interval <= retry_timeout,
+            "db retry_interval must be less than or equal to retry_timeout"
+        );
+
+        Ok(SqlxClient {
             pool,
             retry_interval,
             retry_timeout,
-        }
+        })
     }
 
     pub fn pg_pool(&self) -> PgPool {

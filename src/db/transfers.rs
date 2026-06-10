@@ -554,7 +554,15 @@ impl SqlxClient {
                     sending_message_hash = $2,
                     expired_at = $3,
                     updated_at = current_timestamp
-                WHERE transaction_hash = $1 AND status = 'New'::transaction_status
+                WHERE transaction_hash = $1
+                    AND (
+                        status = 'New'::transaction_status
+                        OR (
+                            status = 'Pending'::transaction_status
+                            AND sending_message_hash = $2
+                            AND expired_at = $3
+                        )
+                    )
                 RETURNING transaction_hash"#,
                 tx_hash.to_string(),
                 message_hash.to_string(),
@@ -577,7 +585,15 @@ impl SqlxClient {
                     sending_message_hash = $2,
                     expired_at = $3,
                     updated_at = current_timestamp
-                WHERE transaction_hash = $1 AND status = 'New'::transaction_status
+                WHERE transaction_hash = $1
+                    AND (
+                        status = 'New'::transaction_status
+                        OR (
+                            status = 'Pending'::transaction_status
+                            AND sending_message_hash = $2
+                            AND expired_at = $3
+                        )
+                    )
                 RETURNING transaction_hash"#,
                 tx_hash.to_string(),
                 message_hash.to_string(),

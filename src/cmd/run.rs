@@ -62,7 +62,8 @@ impl Cmd {
                 .with_fallback(archive_block_provider.clone());
 
             let sqlx_client =
-                SqlxClient::new(pool, config.db.retry_interval, config.db.retry_timeout);
+                SqlxClient::new(pool, config.db.retry_interval, config.db.retry_timeout)?;
+
             let wallet_address = HighloadWallet::compute_address(&config.relay.wallet.secret)?;
             anyhow::ensure!(
                 wallet_address == config.relay.wallet.address,

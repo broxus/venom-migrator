@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT\n                transaction_hash,\n                transaction_lt,\n                transaction_time,\n                sender_wc,\n                sender_account,\n                recipient_wc,\n                recipient_account,\n                value,\n                ticker,\n                source_token_root_wc,\n                source_token_root_account,\n                target_token_root_wc,\n                target_token_root_account,\n                source_token_wallet_wc,\n                source_token_wallet_account,\n                target_token_wallet_wc,\n                target_token_wallet_account\n            FROM token_transfers\n            WHERE status = 'New'::transaction_status\n            ORDER BY created_at, transaction_hash",
+  "query": "SELECT\n                transaction_hash,\n                transaction_lt,\n                transaction_time,\n                sender_wc,\n                sender_account,\n                recipient_wc,\n                recipient_account,\n                value,\n                ticker,\n                source_token_root_wc,\n                source_token_root_account,\n                target_token_root_wc,\n                target_token_root_account,\n                source_token_wallet_wc,\n                source_token_wallet_account,\n                target_token_wallet_wc,\n                target_token_wallet_account\n            FROM token_transfers\n            WHERE status IN ('New'::transaction_status, 'Expired'::transaction_status)\n            ORDER BY created_at, transaction_hash",
   "describe": {
     "columns": [
       {
@@ -214,5 +214,5 @@
       false
     ]
   },
-  "hash": "e4cdc8534830a409b8e94c791953323eb4784dbe5e85b068ac661e33811710b4"
+  "hash": "33a22a678cf08bf5e76bbe4765287391a3694039ffe7f0de84eafb861fdddb63"
 }

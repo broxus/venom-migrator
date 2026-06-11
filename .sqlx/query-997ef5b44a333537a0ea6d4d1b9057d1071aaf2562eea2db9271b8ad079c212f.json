@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE token_transfers\n                SET status = 'Pending'::transaction_status,\n                    sending_message_hash = $2,\n                    expired_at = $3,\n                    updated_at = current_timestamp\n                WHERE transaction_hash = $1\n                    AND (\n                        status = 'New'::transaction_status\n                        OR (\n                            status = 'Pending'::transaction_status\n                            AND sending_message_hash = $2\n                            AND expired_at = $3\n                        )\n                        OR status = 'Expired'::transaction_status\n                    )\n                RETURNING transaction_hash",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "transaction_hash",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "token_transfers",
+            "name": "transaction_hash"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Numeric"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "997ef5b44a333537a0ea6d4d1b9057d1071aaf2562eea2db9271b8ad079c212f"
+}

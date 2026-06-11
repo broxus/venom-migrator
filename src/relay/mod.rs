@@ -389,7 +389,7 @@ impl TxHandler {
 
         tracing::info!(
             count = transfers.len(),
-            "recovering new relay transfers from database"
+            "recovering unsent relay transfers from database"
         );
 
         for transfer in transfers {
@@ -422,6 +422,8 @@ impl TxHandler {
             }
         }
 
+        let retry_transfers = transfers.clone();
+
         let msg = self.wallet.prepare_message(transfers, 60).await?;
         let msg_hash = *CellBuilder::build_from(&msg.message)?.repr_hash();
 
@@ -445,6 +447,8 @@ impl TxHandler {
                 self.sqlx_client
                     .mark_relay_transfers_expired(&native_hashes, &token_hashes, &msg_hash)
                     .await?;
+
+                self.batch.transfers.extend(retry_transfers);
             }
         }
 
@@ -542,6 +546,9 @@ async fn wait_pending_message(
                 message.message_hash,
             );
 
+            // Recovered pending transfers are only marked as expired here.
+            // They are not added back to the in-memory batch in this run; restart the service
+            // to load expired transfers from DB and send them again.
             sqlx_client
                 .mark_relay_transfers_expired(
                     &message.native_tx_hashes,
@@ -549,6 +556,8 @@ async fn wait_pending_message(
                     &message.message_hash,
                 )
                 .await?;
+
+            // TODO: add transfer to in-memory batch
         }
     }
 

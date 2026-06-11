@@ -423,7 +423,7 @@ impl SqlxClient {
                 recipient_account,
                 value
             FROM transfers
-            WHERE status = 'New'::transaction_status
+            WHERE status IN ('New'::transaction_status, 'Expired'::transaction_status)
             ORDER BY created_at, transaction_hash"#
         )
         .fetch_all(&self.pool)
@@ -450,7 +450,7 @@ impl SqlxClient {
                 target_token_wallet_wc,
                 target_token_wallet_account
             FROM token_transfers
-            WHERE status = 'New'::transaction_status
+            WHERE status IN ('New'::transaction_status, 'Expired'::transaction_status)
             ORDER BY created_at, transaction_hash"#
         )
         .fetch_all(&self.pool)
@@ -573,6 +573,7 @@ impl SqlxClient {
                             AND sending_message_hash = $2
                             AND expired_at = $3
                         )
+                        OR status = 'Expired'::transaction_status
                     )
                 RETURNING transaction_hash"#,
                 tx_hash.to_string(),
@@ -604,6 +605,7 @@ impl SqlxClient {
                             AND sending_message_hash = $2
                             AND expired_at = $3
                         )
+                        OR status = 'Expired'::transaction_status
                     )
                 RETURNING transaction_hash"#,
                 tx_hash.to_string(),

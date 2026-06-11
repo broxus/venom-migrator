@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT\n                transaction_hash,\n                transaction_lt,\n                transaction_time,\n                sender_wc,\n                sender_account,\n                recipient_wc,\n                recipient_account,\n                value\n            FROM transfers\n            WHERE status = 'New'::transaction_status\n            ORDER BY created_at, transaction_hash",
+  "query": "SELECT\n                transaction_hash,\n                transaction_lt,\n                transaction_time,\n                sender_wc,\n                sender_account,\n                recipient_wc,\n                recipient_account,\n                value\n            FROM transfers\n            WHERE status IN ('New'::transaction_status, 'Expired'::transaction_status)\n            ORDER BY created_at, transaction_hash",
   "describe": {
     "columns": [
       {
@@ -106,5 +106,5 @@
       false
     ]
   },
-  "hash": "9eeb3389b561afabb272e414d6b683a16ceda9770c71186494938fde70187b4f"
+  "hash": "3b904adb31b21c8fdfd9902941b36510a162f6649cbf4ff8520a473ca975f9d6"
 }

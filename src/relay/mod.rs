@@ -169,6 +169,7 @@ impl TxHandler {
             pending_messages.clone(),
             Tokens::new(config.wallet.min_required_balance),
         )?;
+
         anyhow::ensure!(
             *wallet.address() == config.wallet.address,
             "wallet address mismatch: expected={}, got={}",
@@ -195,7 +196,19 @@ impl TxHandler {
             let target_token_wallet = target_contract.wallet_of(wallet.address().clone())?;
 
             let source_ticker = source_contract.symbol()?;
+            let source_decimals = source_contract.decimals()?;
+
             let _target_ticker = target_contract.symbol()?;
+            let target_decimals = target_contract.decimals()?;
+
+            anyhow::ensure!(
+                source_decimals == target_decimals,
+                "token route decimals mismatch: source_root={}, target_root={}, source_decimals={}, target_decimals={}",
+                route.source_root,
+                route.target_root,
+                source_decimals,
+                target_decimals,
+            );
 
             // anyhow::ensure!(
             //     source_ticker == target_ticker,

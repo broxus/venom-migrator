@@ -22,6 +22,20 @@ impl RootTokenContract<'_> {
         values.unpack_first()
     }
 
+    pub fn decimals(&mut self) -> anyhow::Result<u8> {
+        let inputs = [AbiValue::uint(32, 0u32).named("answerId")];
+        let ExecutionOutput { values, exit_code } =
+            self.0.run_local_responsible(super::decimals(), &inputs)?;
+
+        if exit_code != 0 {
+            return Err(anyhow::anyhow!(
+                "Failed to get decimals with exit code {exit_code}"
+            ));
+        }
+
+        values.unpack_first()
+    }
+
     pub fn wallet_of(&mut self, owner: StdAddr) -> anyhow::Result<StdAddr> {
         let inputs = [
             AbiValue::uint(32, 0u32).named("answerId"),

@@ -19,6 +19,18 @@ pub fn symbol() -> &'static Function {
     }
 }
 
+pub fn decimals() -> &'static Function {
+    declare_function! {
+        name: "decimals",
+        inputs: vec![
+            AbiType::Uint(32).named("answerId"),
+        ],
+        outputs: vec![
+            AbiType::Uint(8).named("decimals"),
+        ],
+    }
+}
+
 pub fn wallet_of() -> &'static Function {
     declare_function! {
         name: "walletOf",

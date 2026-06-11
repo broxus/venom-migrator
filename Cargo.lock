@@ -4478,6 +4478,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tikv-jemallocator",
  "tokio",
+ "tower-http",
  "tracing",
  "tycho-core",
  "tycho-types",

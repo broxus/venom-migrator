@@ -22,6 +22,8 @@ fn main() -> ExitCode {
         unsafe { std::env::set_var("RUST_LIB_BACKTRACE", "0") };
     }
 
+    venom_migrator::utils::panic::set_abort_on_panic();
+
     match App::parse().run() {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {

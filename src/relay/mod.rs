@@ -43,7 +43,6 @@ pub async fn run(
     .await?;
 
     let mut tx_handler = TxHandler::new(config, sqlx_client, pending_messages).await?;
-    tx_handler.recover_pending_messages().await?;
     tx_handler.recover_new_transfers().await?;
 
     let mut flush_interval = tokio::time::interval(config.wallet.transfer_batch_flush_interval);
@@ -122,11 +121,41 @@ pub async fn run(
     }
 }
 
+pub async fn recover_pending_messages(
+    config: &RelayConfig,
+    sqlx_client: SqlxClient,
+    pending_messages: PendingMessages,
+) -> anyhow::Result<()> {
+    let messages = sqlx_client.load_pending_relay_messages().await?;
+    if messages.is_empty() {
+        return Ok(());
+    }
+
+    tracing::info!(
+        count = messages.len(),
+        "recovering pending relay messages from database"
+    );
+
+    for message in messages {
+        let rx = pending_messages.add_message(
+            config.wallet.address.address,
+            message.message_hash,
+            message.expired_at,
+        )?;
+
+        spawn_background_task(
+            "Wait pending relay message",
+            wait_pending_message(sqlx_client.clone(), message, rx),
+        );
+    }
+
+    Ok(())
+}
+
 struct TxHandler {
     owner: StdAddr,
     wallet: HighloadWallet,
     sqlx_client: SqlxClient,
-    pending_messages: PendingMessages,
     batch: TxBatch,
     tokens: FastHashMap<StdAddr, TokenWalletInfo>,
 }
@@ -236,7 +265,6 @@ impl TxHandler {
             tokens,
             wallet,
             sqlx_client,
-            pending_messages,
             batch: TxBatch::new(config.wallet.transfer_batch_size),
         })
     }
@@ -367,39 +395,6 @@ impl TxHandler {
 
     fn is_batch_full(&self) -> bool {
         self.batch.is_full()
-    }
-
-    async fn recover_pending_messages(&self) -> anyhow::Result<()> {
-        let messages = self.sqlx_client.load_pending_relay_messages().await?;
-        if messages.is_empty() {
-            return Ok(());
-        }
-
-        tracing::info!(
-            count = messages.len(),
-            "recovering pending relay messages from database"
-        );
-
-        for message in messages {
-            self.recover_pending_message(message)?;
-        }
-
-        Ok(())
-    }
-
-    fn recover_pending_message(&self, message: PendingRelayMessage) -> anyhow::Result<()> {
-        let rx = self.pending_messages.add_message(
-            self.wallet.address().address,
-            message.message_hash,
-            message.expired_at,
-        )?;
-
-        spawn_background_task(
-            "Wait pending relay message",
-            wait_pending_message(self.sqlx_client.clone(), message, rx),
-        );
-
-        Ok(())
     }
 
     async fn recover_new_transfers(&mut self) -> anyhow::Result<()> {

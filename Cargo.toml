@@ -34,6 +34,10 @@ everscale-jrpc-transaction-consumer = { git = "https://github.com/broxus/jrpc-tr
 rand = "0.10.1"
 serde_json = "1.0.150"
 axum = { version = "0.8", features = ["tokio", "http1", "json"] }
+tower-http = { version = "0.6.11", features = ["cors"] }
 
 [build-dependencies]
 anyhow = "1.0"
+
+[profile.release]
+panic = "abort"

@@ -75,6 +75,13 @@ impl Cmd {
             let sync_ready = Arc::new(Notify::new());
             let pending_messages = PendingMessages::default();
 
+            relay::recover_pending_messages(
+                &config.relay,
+                sqlx_client.clone(),
+                pending_messages.clone(),
+            )
+            .await?;
+
             let block_strider = node.build_strider(
                 archive_block_provider.chain((blockchain_block_provider, storage_block_provider)),
                 (

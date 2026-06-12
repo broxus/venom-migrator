@@ -26,6 +26,7 @@ pub enum TransferStatus {
     Expired,
     Done,
     Failed,
+    Unconfirmed,
 }
 
 #[derive(Debug, Clone, Copy)]

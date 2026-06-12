@@ -33,6 +33,7 @@ pub struct LightSubscriberPrepared {
     gen_utime: u32,
     delivered_messages: Vec<DeliveredMessage>,
     failed_message_hashes: Vec<HashBytes>,
+    unconfirmed_message_hashes: Vec<HashBytes>,
     completed_native_transfers: Vec<TransferConfirmation>,
     completed_token_transfers: Vec<TransferConfirmation>,
 }
@@ -66,6 +67,7 @@ impl LightSubscriber {
         let block_info = cx.block.load_info()?;
         let mut delivered_messages = Vec::new();
         let mut failed_message_hashes = Vec::new();
+        let mut unconfirmed_message_hashes = Vec::new();
         let mut completed_native_transfers = Vec::new();
         let mut completed_token_transfers = Vec::new();
 
@@ -75,6 +77,7 @@ impl LightSubscriber {
                 gen_utime: block_info.gen_utime,
                 delivered_messages,
                 failed_message_hashes,
+                unconfirmed_message_hashes,
                 completed_native_transfers,
                 completed_token_transfers,
             });
@@ -127,6 +130,7 @@ impl LightSubscriber {
 
                 completed_native_transfers.extend(native);
                 completed_token_transfers.extend(token);
+                unconfirmed_message_hashes.push(in_msg_hash);
             }
         }
 
@@ -135,6 +139,7 @@ impl LightSubscriber {
             gen_utime: block_info.gen_utime,
             delivered_messages,
             failed_message_hashes,
+            unconfirmed_message_hashes,
             completed_native_transfers,
             completed_token_transfers,
         })
@@ -150,6 +155,10 @@ impl LightSubscriber {
                 &prepared.completed_native_transfers,
                 &prepared.completed_token_transfers,
             )
+            .await?;
+
+        self.sqlx_client
+            .mark_relay_transfers_unconfirmed(&prepared.unconfirmed_message_hashes)
             .await?;
 
         for message in &prepared.delivered_messages {

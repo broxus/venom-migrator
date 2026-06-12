@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE transfers\n                SET status = 'Unconfirmed'::transaction_status,\n                    updated_at = current_timestamp\n                WHERE sending_message_hash = $1\n                    AND status IN ('Pending'::transaction_status, 'Unconfirmed'::transaction_status)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "250375101e452fe9d179cc674210755edfeeb4838a0ec1ecea5ce0935fd7cb03"
+}

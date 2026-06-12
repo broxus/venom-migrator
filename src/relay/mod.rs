@@ -43,7 +43,7 @@ pub async fn run(
     .await?;
 
     let mut tx_handler = TxHandler::new(config, sqlx_client, pending_messages).await?;
-    tx_handler.recover_new_transfers().await?;
+    tx_handler.recover_unsent_transfers().await?;
 
     let mut flush_interval = tokio::time::interval(config.wallet.transfer_batch_flush_interval);
     flush_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
@@ -397,8 +397,8 @@ impl TxHandler {
         self.batch.is_full()
     }
 
-    async fn recover_new_transfers(&mut self) -> anyhow::Result<()> {
-        let transfers = self.sqlx_client.load_new_relay_transfers().await?;
+    async fn recover_unsent_transfers(&mut self) -> anyhow::Result<()> {
+        let transfers = self.sqlx_client.load_unsent_relay_transfers().await?;
         if transfers.is_empty() {
             return Ok(());
         }

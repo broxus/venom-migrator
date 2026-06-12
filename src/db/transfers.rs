@@ -52,9 +52,9 @@ impl SqlxClient {
         .await
     }
 
-    pub async fn load_new_relay_transfers(&self) -> anyhow::Result<Vec<RelayTransfer>> {
-        self.retry("load_new_relay_transfers", || async {
-            self.load_new_relay_transfers_impl().await
+    pub async fn load_unsent_relay_transfers(&self) -> anyhow::Result<Vec<RelayTransfer>> {
+        self.retry("load_unsent_relay_transfers", || async {
+            self.load_unsent_relay_transfers_impl().await
         })
         .await
     }
@@ -111,6 +111,17 @@ impl SqlxClient {
     ) -> anyhow::Result<()> {
         self.retry("mark_relay_transfers_failed", || async {
             self.mark_relay_transfers_failed_impl(message_hashes).await
+        })
+        .await
+    }
+
+    pub async fn mark_relay_transfers_unconfirmed(
+        &self,
+        message_hashes: &[HashBytes],
+    ) -> anyhow::Result<()> {
+        self.retry("mark_relay_transfers_unconfirmed", || async {
+            self.mark_relay_transfers_unconfirmed_impl(message_hashes)
+                .await
         })
         .await
     }
@@ -399,7 +410,7 @@ impl SqlxClient {
         Ok(messages)
     }
 
-    async fn load_new_relay_transfers_impl(&self) -> anyhow::Result<Vec<RelayTransfer>> {
+    async fn load_unsent_relay_transfers_impl(&self) -> anyhow::Result<Vec<RelayTransfer>> {
         let native = sqlx::query_as!(
             NativeTransferFromDb,
             r#"SELECT
@@ -697,6 +708,41 @@ impl SqlxClient {
                     updated_at = current_timestamp
                 WHERE sending_message_hash = $1
                     AND status IN ('Pending'::transaction_status, 'Failed'::transaction_status)"#,
+                message_hash.to_string(),
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        tx.commit().await?;
+
+        Ok(())
+    }
+
+    async fn mark_relay_transfers_unconfirmed_impl(
+        &self,
+        message_hashes: &[HashBytes],
+    ) -> anyhow::Result<()> {
+        let mut tx = self.pool.begin().await?;
+
+        for message_hash in message_hashes {
+            sqlx::query!(
+                r#"UPDATE transfers
+                SET status = 'Unconfirmed'::transaction_status,
+                    updated_at = current_timestamp
+                WHERE sending_message_hash = $1
+                    AND status IN ('Pending'::transaction_status, 'Unconfirmed'::transaction_status)"#,
+                message_hash.to_string(),
+            )
+            .execute(&mut *tx)
+            .await?;
+
+            sqlx::query!(
+                r#"UPDATE token_transfers
+                SET status = 'Unconfirmed'::transaction_status,
+                    updated_at = current_timestamp
+                WHERE sending_message_hash = $1
+                    AND status IN ('Pending'::transaction_status, 'Unconfirmed'::transaction_status)"#,
                 message_hash.to_string(),
             )
             .execute(&mut *tx)

@@ -110,6 +110,21 @@ impl HighloadWallet {
         self.prepare_signed_message(gifts, timeout).await
     }
 
+    pub async fn deploy(&self, timeout: u32) -> Result<HashBytes> {
+        let message = self.prepare_deploy_message(timeout).await?;
+
+        let tx = self
+            .inner
+            .transport
+            .send_message_reliable(&message.message)
+            .await
+            .context("failed to send deploy message")?;
+
+        let tx = CellBuilder::build_from(&tx)?;
+
+        Ok(*tx.repr_hash())
+    }
+
     pub async fn send_message(
         &self,
         message: &OwnedMessage,
@@ -204,6 +219,37 @@ impl HighloadWallet {
 
         let expire_at = unsigned.expire_at;
         let message = self.sign(unsigned, state.init, context)?;
+
+        Ok(PreparedMessage { message, expire_at })
+    }
+
+    async fn prepare_deploy_message(&self, timeout: u32) -> Result<PreparedMessage> {
+        let this = self.inner.as_ref();
+        let expire_at = (now_millis() / 1000) as u32 + timeout.clamp(1, 60);
+
+        let init_data = InitData::from_key(&this.key.verifying_key()).with_wallet_id(WALLET_ID);
+        let (hash, payload) = init_data.make_transfer_payload(Vec::<Gift>::new(), expire_at)?;
+
+        let config = this.transport.get_config().await?;
+        let global_version = config.config.get_global_version()?;
+
+        let context = SignatureContext {
+            global_id: config.global_id,
+            capabilities: global_version.capabilities,
+        };
+
+        let unsigned = UnsignedHighloadMessage {
+            gifts: Vec::new(),
+            payload,
+            hash,
+            expire_at,
+        };
+
+        let message = self.sign(
+            unsigned,
+            Some(make_state_init(&this.key.verifying_key())?),
+            context,
+        )?;
 
         Ok(PreparedMessage { message, expire_at })
     }

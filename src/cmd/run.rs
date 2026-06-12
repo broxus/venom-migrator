@@ -7,12 +7,15 @@ use tokio::sync::Notify;
 use tokio::sync::futures::OwnedNotified;
 use tycho_core::block_strider::{BlockProviderExt, MetricsSubscriber};
 use tycho_core::node::{LightNodeConfig, LightNodeContext, NodeBaseConfig, NodeBootArgs};
+use tycho_types::num::Tokens;
 use tycho_util::cli;
 use tycho_util::cli::config::ThreadPoolConfig;
 use tycho_util::cli::logger::LoggerConfig;
 use tycho_util::cli::metrics::MetricsConfig;
 use tycho_util::config::PartialConfig;
 
+use ed25519_dalek::SigningKey;
+use nekoton_transport::rpc::RpcTransport;
 use venom_migrator::api::{self, ApiConfig};
 use venom_migrator::db::{DbConfig, SqlxClient};
 use venom_migrator::relay;
@@ -75,12 +78,21 @@ impl Cmd {
             let sync_ready = Arc::new(Notify::new());
             let pending_messages = PendingMessages::default();
 
-            relay::recover_pending_messages(
-                &config.relay,
-                sqlx_client.clone(),
+            let tycho_transport = {
+                let endpoint = config.relay.tycho_rpc.parse()?;
+                RpcTransport::new([endpoint], Default::default(), false).await?
+            };
+
+            let wallet = HighloadWallet::new(
+                Arc::new(SigningKey::from_bytes(
+                    config.relay.wallet.secret.as_array(),
+                )),
+                tycho_transport,
                 pending_messages.clone(),
-            )
-            .await?;
+                Tokens::new(config.relay.wallet.min_required_balance),
+            )?;
+
+            relay::recover_pending_messages(sqlx_client.clone(), wallet.clone()).await?;
 
             let block_strider = node.build_strider(
                 archive_block_provider.chain((blockchain_block_provider, storage_block_provider)),
@@ -103,7 +115,7 @@ impl Cmd {
             tokio::select! {
                 res = block_strider.run() => res?,
                 res = run_api(api_ready, &config.api, sqlx_client.clone()) => res?,
-                res = run_relay(relay_ready, &config.relay, sqlx_client, pending_messages) => res?,
+                res = run_relay(relay_ready, &config.relay, sqlx_client, wallet) => res?,
             }
 
             // Done
@@ -126,11 +138,11 @@ async fn run_relay(
     sync_ready: OwnedNotified,
     config: &RelayConfig,
     sqlx_client: SqlxClient,
-    pending_messages: PendingMessages,
+    wallet: HighloadWallet,
 ) -> Result<()> {
     sync_ready.await;
     tracing::info!("light subscriber caught up, starting relay");
-    relay::run(config, sqlx_client, pending_messages).await
+    relay::run(config, sqlx_client, wallet).await
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialConfig)]

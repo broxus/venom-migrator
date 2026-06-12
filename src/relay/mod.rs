@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use crate::db::{PendingRelayMessage, SqlxClient};
-use ed25519_dalek::SigningKey;
 use everscale_jrpc_transaction_consumer::{
     ConsumedTransaction, TransactionConsumer as JrpcTransactionConsumer,
 };
@@ -11,7 +10,6 @@ use nekoton_core::transport::Transport;
 use nekoton_transport::rpc::RpcTransport;
 use tycho_types::cell::{CellBuilder, CellSlice, HashBytes};
 use tycho_types::models::{MsgInfo, StdAddr, Transaction, TxInfo};
-use tycho_types::num::Tokens;
 use tycho_util::FastHashMap;
 
 pub mod config;
@@ -26,14 +24,14 @@ use crate::relay::wallet::HighloadWallet;
 use crate::utils::abi::UnpackAbiPlain;
 use crate::utils::background_task::spawn_background_task;
 use crate::utils::comment_parser;
-use crate::utils::pending_messages::{MessageStatus, MessageStatusRx, PendingMessages};
+use crate::utils::pending_messages::{MessageStatus, MessageStatusRx};
 use crate::utils::token_wallets;
 use crate::utils::token_wallets::models::RootTokenContract;
 
 pub async fn run(
     config: &RelayConfig,
     sqlx_client: SqlxClient,
-    pending_messages: PendingMessages,
+    wallet: HighloadWallet,
 ) -> anyhow::Result<()> {
     let transaction_consumer = JrpcTransactionConsumer::from_jrpc(
         config.venom_rpc.clone(),
@@ -42,7 +40,7 @@ pub async fn run(
     )
     .await?;
 
-    let mut tx_handler = TxHandler::new(config, sqlx_client, pending_messages).await?;
+    let mut tx_handler = TxHandler::new(config, sqlx_client, wallet).await?;
     tx_handler.recover_unsent_transfers().await?;
 
     let mut flush_interval = tokio::time::interval(config.wallet.transfer_batch_flush_interval);
@@ -122,9 +120,8 @@ pub async fn run(
 }
 
 pub async fn recover_pending_messages(
-    config: &RelayConfig,
     sqlx_client: SqlxClient,
-    pending_messages: PendingMessages,
+    wallet: HighloadWallet,
 ) -> anyhow::Result<()> {
     let messages = sqlx_client.load_pending_relay_messages().await?;
     if messages.is_empty() {
@@ -137,15 +134,11 @@ pub async fn recover_pending_messages(
     );
 
     for message in messages {
-        let rx = pending_messages.add_message(
-            config.wallet.address.address,
-            message.message_hash,
-            message.expired_at,
-        )?;
+        let rx = wallet.add_pending_message(message.message_hash, message.expired_at)?;
 
         spawn_background_task(
             "Wait pending relay message",
-            wait_pending_message(sqlx_client.clone(), message, rx),
+            wait_pending_message(sqlx_client.clone(), wallet.clone(), message, rx),
         );
     }
 
@@ -164,7 +157,7 @@ impl TxHandler {
     async fn new(
         config: &RelayConfig,
         sqlx_client: SqlxClient,
-        pending_messages: PendingMessages,
+        wallet: HighloadWallet,
     ) -> anyhow::Result<Self> {
         let venom_ctx = {
             let endpoint = config.venom_rpc.parse()?;
@@ -178,26 +171,17 @@ impl TxHandler {
                 .build()?
         };
 
-        let (tycho_transport, tycho_ctx) = {
+        let tycho_ctx = {
             let endpoint = config.tycho_rpc.parse()?;
             let transport = RpcTransport::new([endpoint], Default::default(), false).await?;
 
             let blockchain_config = transport.get_config().await?.config;
 
-            let context = BlockchainContextBuilder::new()
+            BlockchainContextBuilder::new()
                 .with_config(blockchain_config)
                 .with_transport(Arc::new(transport.clone()))
-                .build()?;
-
-            (transport, context)
+                .build()?
         };
-
-        let wallet = HighloadWallet::new(
-            Arc::new(SigningKey::from_bytes(config.wallet.secret.as_array())),
-            tycho_transport.clone(),
-            pending_messages.clone(),
-            Tokens::new(config.wallet.min_required_balance),
-        )?;
 
         anyhow::ensure!(
             *wallet.address() == config.wallet.address,
@@ -452,6 +436,12 @@ impl TxHandler {
         {
             MessageStatus::Delivered => {}
             MessageStatus::Expired => {
+                anyhow::ensure!(
+                    self.wallet.get_transaction(&msg_hash).await?.is_none(),
+                    "relay message expired locally, but destination transaction already exists: message_hash={}",
+                    msg_hash,
+                );
+
                 self.sqlx_client
                     .mark_relay_transfers_expired(&native_hashes, &token_hashes, &msg_hash)
                     .await?;
@@ -531,6 +521,7 @@ impl TxHandler {
 
 async fn wait_pending_message(
     sqlx_client: SqlxClient,
+    wallet: HighloadWallet,
     message: PendingRelayMessage,
     rx: MessageStatusRx,
 ) -> anyhow::Result<()> {
@@ -542,6 +533,15 @@ async fn wait_pending_message(
             );
         }
         MessageStatus::Expired => {
+            anyhow::ensure!(
+                wallet
+                    .get_transaction(&message.message_hash)
+                    .await?
+                    .is_none(),
+                "recovered relay message expired locally, but destination transaction already exists: message_hash={}",
+                message.message_hash,
+            );
+
             sqlx_client
                 .mark_relay_transfers_expired(
                     &message.native_tx_hashes,

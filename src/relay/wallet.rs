@@ -14,13 +14,14 @@ use tycho_types::models::vm::SendMsgFlags;
 use tycho_types::models::{
     AccountState, CurrencyCollection, ExtInMsgInfo, IntAddr, MsgInfo, OwnedMessage,
     OwnedRelaxedMessage, RelaxedIntMsgInfo, RelaxedMsgInfo, SignatureContext, StateInit, StdAddr,
+    Transaction,
 };
 use tycho_types::num::Tokens;
 use tycho_types::prelude::*;
 use tycho_util::time::now_millis;
 
 use crate::relay::models::RelayTransfer;
-use crate::utils::pending_messages::{MessageStatus, PendingMessages};
+use crate::utils::pending_messages::{MessageStatus, MessageStatusRx, PendingMessages};
 use crate::utils::token_wallets;
 
 const WALLET_ID: u32 = 0;
@@ -63,6 +64,16 @@ impl HighloadWallet {
 
     pub fn address(&self) -> &StdAddr {
         &self.inner.address
+    }
+
+    pub fn add_pending_message(
+        &self,
+        message_hash: HashBytes,
+        expire_at: u32,
+    ) -> Result<MessageStatusRx> {
+        self.inner
+            .pending_messages
+            .add_message(self.inner.address.address, message_hash, expire_at)
     }
 
     pub async fn prepare_message(
@@ -154,6 +165,14 @@ impl HighloadWallet {
             .context("failed to send external message")?;
 
         rx.await.context("pending message status sender dropped")
+    }
+
+    pub async fn get_transaction(&self, message_hash: &HashBytes) -> Result<Option<Transaction>> {
+        self.inner
+            .transport
+            .get_dst_transaction(message_hash)
+            .await
+            .context("failed to get transaction by message hash")
     }
 
     fn prepare_unsigned_message(

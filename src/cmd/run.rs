@@ -115,14 +115,13 @@ impl Cmd {
                 ),
             );
 
-            tracing::info!("waiting for light subscriber to catch up before running services");
+            tracing::info!("waiting for light subscriber to catch up before running relay");
 
-            let api_ready = sync_ready.clone().notified_owned();
             let relay_ready = sync_ready.clone().notified_owned();
 
             tokio::select! {
                 res = block_strider.run() => res?,
-                res = run_api(api_ready, &config.api, sqlx_client.clone()) => res?,
+                res = api::serve(&config.api, sqlx_client.clone()) => res?,
                 res = run_relay(relay_ready, &config.relay, sqlx_client, wallet) => res?,
             }
 
@@ -130,16 +129,6 @@ impl Cmd {
             Ok(())
         })
     }
-}
-
-async fn run_api(
-    sync_ready: OwnedNotified,
-    config: &ApiConfig,
-    sqlx_client: SqlxClient,
-) -> Result<()> {
-    sync_ready.await;
-    tracing::info!("light subscriber caught up, starting api");
-    api::serve(config, sqlx_client).await
 }
 
 async fn run_relay(

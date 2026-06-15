@@ -1,7 +1,6 @@
 use everscale_jrpc_transaction_consumer::TransactionConsumerOptions;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tycho_types::cell::HashBytes;
 use tycho_types::models::StdAddr;
 use tycho_util::serde_helpers;
 
@@ -55,7 +54,6 @@ pub struct TokenRouteConfig {
 #[serde(default)]
 pub struct WalletConfig {
     pub address: StdAddr,
-    pub secret: HashBytes,
     #[serde(with = "serde_helpers::string")]
     pub min_required_balance: u128,
     pub transfer_batch_size: usize,
@@ -68,7 +66,6 @@ impl Default for WalletConfig {
     fn default() -> Self {
         Self {
             address: Default::default(),
-            secret: Default::default(),
             min_required_balance: 10_000_000_000,
             transfer_batch_size: 50,
             transfer_batch_flush_interval: Duration::from_secs(30),

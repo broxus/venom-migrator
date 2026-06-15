@@ -80,7 +80,6 @@ impl SqlxClient {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct DbConfig {
-    pub url: String,
     pub pool_size: u32,
     #[serde(with = "serde_helpers::humantime")]
     pub retry_interval: Duration,
@@ -91,7 +90,6 @@ pub struct DbConfig {
 impl Default for DbConfig {
     fn default() -> Self {
         Self {
-            url: Default::default(),
             pool_size: 5,
             retry_interval: Duration::from_secs(5),
             retry_timeout: Duration::from_secs(30),

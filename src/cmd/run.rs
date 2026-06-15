@@ -1,12 +1,14 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPoolOptions;
+use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::Notify;
 use tokio::sync::futures::OwnedNotified;
 use tycho_core::block_strider::{BlockProviderExt, MetricsSubscriber};
 use tycho_core::node::{LightNodeConfig, LightNodeContext, NodeBaseConfig, NodeBootArgs};
+use tycho_types::cell::HashBytes;
 use tycho_types::num::Tokens;
 use tycho_util::cli;
 use tycho_util::cli::config::ThreadPoolConfig;
@@ -41,10 +43,13 @@ impl Cmd {
                 ..
             } = ctx;
 
+            let database_url = std::env::var("VENOM_MIGRATOR_DATABASE_URL")
+                .context("VENOM_MIGRATOR_DATABASE_URL environment variable must be set")?;
+
             // Connect to DB
             let pool = PgPoolOptions::new()
                 .max_connections(config.db.pool_size)
-                .connect(&config.db.url)
+                .connect(&database_url)
                 .await?;
 
             sqlx::migrate!().run(&pool).await?;
@@ -67,7 +72,12 @@ impl Cmd {
             let sqlx_client =
                 SqlxClient::new(pool, config.db.retry_interval, config.db.retry_timeout)?;
 
-            let wallet_address = HighloadWallet::compute_address(&config.relay.wallet.secret)?;
+            let wallet_secret_str = std::env::var("VENOM_MIGRATOR_WALLET_SECRET")
+                .context("VENOM_MIGRATOR_WALLET_SECRET environment variable must be set")?;
+            let wallet_secret =
+                HashBytes::from_str(wallet_secret_str.trim()).context("invalid wallet secret")?;
+
+            let wallet_address = HighloadWallet::compute_address(&wallet_secret)?;
             anyhow::ensure!(
                 wallet_address == config.relay.wallet.address,
                 "wallet address mismatch: expected={}, got={}",
@@ -84,9 +94,7 @@ impl Cmd {
             };
 
             let wallet = HighloadWallet::new(
-                Arc::new(SigningKey::from_bytes(
-                    config.relay.wallet.secret.as_array(),
-                )),
+                Arc::new(SigningKey::from_bytes(wallet_secret.as_array())),
                 tycho_transport,
                 pending_messages.clone(),
                 Tokens::new(config.relay.wallet.min_required_balance),
